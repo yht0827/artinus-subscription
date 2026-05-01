@@ -1,0 +1,19 @@
+spring:
+  application:
+    name: artinus-subscription
+  datasource:
+    url: jdbc:mysql://localhost:3306/artinus_subscription
+    username: root
+    password: password
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+
+external:
+  csrng:
+    url: https://csrng.net/csrng/csrng.php?min=0&max=1
+    connect-timeout: 1s
+    read-timeout: 2s

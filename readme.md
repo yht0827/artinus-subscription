@@ -158,9 +158,9 @@
 - [x] Idempotency-Key 애플리케이션 정책 구현
 - [x] Idempotency-Key 영속성 adapter 연결
 - [x] csrng 외부 API client 구현
+- [x] REST API 구현
 
 ### 예정
-- [ ] REST API 구현
 - [ ] 구독 이력 조회 구현
 - [ ] LLM 요약 fallback 구현
 - [ ] 외부 API 장애 대응 정책 정리

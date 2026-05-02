@@ -11,9 +11,15 @@ import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 
 import com.artinus.subscription.application.result.CompletedIdempotency;
 import com.artinus.subscription.application.result.SubscriptionResult;
+import com.artinus.subscription.domain.channel.Channel;
+import com.artinus.subscription.domain.history.SubscriptionHistory;
+import com.artinus.subscription.domain.member.Member;
 import com.artinus.subscription.domain.subscription.SubscriptionActionType;
 import com.artinus.subscription.domain.subscription.SubscriptionStatus;
+import com.artinus.subscription.infrastructure.persistence.adapter.JpaChannelAdapter;
 import com.artinus.subscription.infrastructure.persistence.adapter.JpaIdempotencyAdapter;
+import com.artinus.subscription.infrastructure.persistence.adapter.JpaMemberAdapter;
+import com.artinus.subscription.infrastructure.persistence.adapter.JpaSubscriptionHistoryAdapter;
 import com.artinus.subscription.infrastructure.persistence.entity.JpaChannelEntity;
 import com.artinus.subscription.infrastructure.persistence.entity.JpaIdempotencyKeyEntity;
 import com.artinus.subscription.infrastructure.persistence.entity.JpaMemberEntity;
@@ -104,5 +110,46 @@ class SubscriptionPersistenceTest {
 				assertThat(found.requestHash()).isEqualTo("request-hash");
 				assertThat(found.response()).isEqualTo(response);
 			});
+	}
+
+	@Test
+	void memberAdapterSavesAndFindsMemberByPhoneNumber() {
+		JpaMemberAdapter adapter = new JpaMemberAdapter(memberRepository);
+		Member member = Member.create("010-1234-5678", SubscriptionStatus.BASIC);
+
+		adapter.save(member);
+
+		assertThat(adapter.findByPhoneNumber("01012345678"))
+			.hasValueSatisfying(found -> assertThat(found.getSubscriptionStatus()).isEqualTo(SubscriptionStatus.BASIC));
+	}
+
+	@Test
+	void channelAdapterFindsChannelById() {
+		JpaChannelAdapter adapter = new JpaChannelAdapter(channelRepository);
+
+		Channel channel = adapter.getById(1L);
+
+		assertThat(channel.name()).isEqualTo("홈페이지");
+		assertThat(channel.supportsSubscribe()).isTrue();
+	}
+
+	@Test
+	void historyAdapterSavesSubscriptionHistory() {
+		JpaMemberAdapter memberAdapter = new JpaMemberAdapter(memberRepository);
+		JpaChannelAdapter channelAdapter = new JpaChannelAdapter(channelRepository);
+		JpaSubscriptionHistoryAdapter historyAdapter = new JpaSubscriptionHistoryAdapter(
+			memberRepository,
+			channelRepository,
+			historyRepository
+		);
+		Member member = memberAdapter.save(Member.create("01012345678", SubscriptionStatus.BASIC));
+		Channel channel = channelAdapter.getById(5L);
+
+		historyAdapter.save(SubscriptionHistory.record(member, channel, SubscriptionActionType.CANCEL,
+			SubscriptionStatus.BASIC, SubscriptionStatus.NONE, LocalDateTime.now()));
+
+		assertThat(historyRepository.findAll())
+			.extracting(JpaSubscriptionHistoryEntity::getActionType)
+			.containsExactly(SubscriptionActionType.CANCEL);
 	}
 }

@@ -3,6 +3,7 @@ package com.artinus.subscription.infrastructure.persistence.entity;
 import java.time.LocalDateTime;
 
 import com.artinus.subscription.domain.member.PhoneNumber;
+import com.artinus.subscription.domain.member.Member;
 import com.artinus.subscription.domain.subscription.SubscriptionStatus;
 
 import jakarta.persistence.Column;
@@ -57,6 +58,10 @@ public class JpaMemberEntity {
 		return new JpaMemberEntity(phoneNumber, subscriptionStatus);
 	}
 
+	public static JpaMemberEntity from(Member member) {
+		return create(member.getPhoneNumber(), member.getSubscriptionStatus());
+	}
+
 	public Long getId() {
 		return id;
 	}
@@ -74,6 +79,10 @@ public class JpaMemberEntity {
 			throw new IllegalArgumentException("Subscription status is required.");
 		}
 		this.subscriptionStatus = subscriptionStatus;
+	}
+
+	public Member toDomain() {
+		return Member.create(phoneNumber, subscriptionStatus);
 	}
 
 	@PrePersist

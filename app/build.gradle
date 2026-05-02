@@ -1,0 +1,22 @@
+plugins {
+	id 'org.springframework.boot'
+}
+
+dependencies {
+	implementation project(':domain')
+	implementation project(':application')
+	implementation project(':infrastructure')
+	implementation project(':api')
+
+	implementation 'org.springframework.boot:spring-boot-starter-actuator'
+	runtimeOnly 'com.mysql:mysql-connector-j'
+	testRuntimeOnly 'com.h2database:h2'
+}
+
+bootJar {
+	enabled = true
+}
+
+jar {
+	enabled = false
+}

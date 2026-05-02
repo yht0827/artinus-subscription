@@ -173,6 +173,13 @@ class SubscriptionCommandServiceTest {
 		public void save(SubscriptionHistory history) {
 			histories.add(history);
 		}
+
+		@Override
+		public List<SubscriptionHistory> findByPhoneNumber(String phoneNumber) {
+			return histories.stream()
+				.filter(history -> history.member().getPhoneNumber().equals(phoneNumber))
+				.toList();
+		}
 	}
 
 	private static class FakeExternalApprovalPort implements ExternalApprovalPort {

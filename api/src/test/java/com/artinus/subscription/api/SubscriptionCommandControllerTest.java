@@ -2,9 +2,13 @@ package com.artinus.subscription.api;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.time.LocalDateTime;
+import java.util.List;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,7 +21,10 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
 import com.artinus.subscription.application.SubscriptionCommandService;
+import com.artinus.subscription.application.SubscriptionHistoryQueryService;
+import com.artinus.subscription.application.result.SubscriptionHistoryResult;
 import com.artinus.subscription.application.result.SubscriptionResult;
+import com.artinus.subscription.domain.subscription.SubscriptionActionType;
 import com.artinus.subscription.domain.subscription.SubscriptionStatus;
 
 @WebMvcTest(SubscriptionCommandController.class)
@@ -29,6 +36,9 @@ class SubscriptionCommandControllerTest {
 
 	@MockitoBean
 	private SubscriptionCommandService subscriptionCommandService;
+
+	@MockitoBean
+	private SubscriptionHistoryQueryService subscriptionHistoryQueryService;
 
 	@SpringBootConfiguration
 	@EnableAutoConfiguration
@@ -73,5 +83,28 @@ class SubscriptionCommandControllerTest {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.phoneNumber").value("01012345678"))
 			.andExpect(jsonPath("$.subscriptionStatus").value("NONE"));
+	}
+
+	@Test
+	void findsSubscriptionHistories() throws Exception {
+		when(subscriptionHistoryQueryService.findByPhoneNumber("010-1234-5678"))
+			.thenReturn(new SubscriptionHistoryResult(
+				List.of(new SubscriptionHistoryResult.HistoryItem(
+					"홈페이지",
+					SubscriptionActionType.SUBSCRIBE,
+					SubscriptionStatus.NONE,
+					SubscriptionStatus.BASIC,
+					LocalDateTime.of(2026, 1, 1, 10, 0)
+				)),
+				""
+			));
+
+		mockMvc.perform(get("/api/v1/subscriptions/histories")
+				.param("phoneNumber", "010-1234-5678"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.history[0].channelName").value("홈페이지"))
+			.andExpect(jsonPath("$.history[0].actionType").value("SUBSCRIBE"))
+			.andExpect(jsonPath("$.history[0].afterStatus").value("BASIC"))
+			.andExpect(jsonPath("$.summary").value(""));
 	}
 }

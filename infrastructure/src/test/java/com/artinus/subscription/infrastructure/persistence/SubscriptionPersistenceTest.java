@@ -152,4 +152,26 @@ class SubscriptionPersistenceTest {
 			.extracting(JpaSubscriptionHistoryEntity::getActionType)
 			.containsExactly(SubscriptionActionType.CANCEL);
 	}
+
+	@Test
+	void historyAdapterFindsHistoriesByPhoneNumber() {
+		JpaMemberEntity member = memberRepository.save(JpaMemberEntity.create("01012345678", SubscriptionStatus.NONE));
+		JpaChannelEntity homepage = channelRepository.findByName("홈페이지").orElseThrow();
+		JpaChannelEntity mobileApp = channelRepository.findByName("모바일앱").orElseThrow();
+		historyRepository.save(JpaSubscriptionHistoryEntity.record(member, homepage, SubscriptionActionType.SUBSCRIBE,
+			SubscriptionStatus.NONE, SubscriptionStatus.BASIC, LocalDateTime.of(2026, 1, 1, 10, 0)));
+		historyRepository.save(JpaSubscriptionHistoryEntity.record(member, mobileApp, SubscriptionActionType.SUBSCRIBE,
+			SubscriptionStatus.BASIC, SubscriptionStatus.PREMIUM, LocalDateTime.of(2026, 1, 2, 10, 0)));
+		JpaSubscriptionHistoryAdapter historyAdapter = new JpaSubscriptionHistoryAdapter(
+			memberRepository,
+			channelRepository,
+			historyRepository
+		);
+
+		List<SubscriptionHistory> histories = historyAdapter.findByPhoneNumber("01012345678");
+
+		assertThat(histories)
+			.extracting(history -> history.channel().name())
+			.containsExactly("홈페이지", "모바일앱");
+	}
 }

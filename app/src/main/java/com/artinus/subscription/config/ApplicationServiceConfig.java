@@ -4,6 +4,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 import com.artinus.subscription.application.SubscriptionCommandService;
+import com.artinus.subscription.application.SubscriptionHistoryQueryService;
 import com.artinus.subscription.application.port.ChannelPort;
 import com.artinus.subscription.application.port.ExternalApprovalPort;
 import com.artinus.subscription.application.port.IdempotencyPort;
@@ -18,5 +19,10 @@ public class ApplicationServiceConfig {
 		SubscriptionHistoryPort historyPort, ExternalApprovalPort externalApprovalPort, IdempotencyPort idempotencyPort) {
 		return new SubscriptionCommandService(memberPort, channelPort, historyPort, externalApprovalPort,
 			idempotencyPort);
+	}
+
+	@Bean
+	public SubscriptionHistoryQueryService subscriptionHistoryQueryService(SubscriptionHistoryPort historyPort) {
+		return new SubscriptionHistoryQueryService(historyPort);
 	}
 }

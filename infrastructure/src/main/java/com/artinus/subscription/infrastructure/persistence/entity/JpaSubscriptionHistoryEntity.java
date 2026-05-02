@@ -69,4 +69,24 @@ public class JpaSubscriptionHistoryEntity {
 	public SubscriptionActionType getActionType() {
 		return actionType;
 	}
+
+	public JpaMemberEntity getMember() {
+		return member;
+	}
+
+	public JpaChannelEntity getChannel() {
+		return channel;
+	}
+
+	public SubscriptionStatus getBeforeStatus() {
+		return beforeStatus;
+	}
+
+	public SubscriptionStatus getAfterStatus() {
+		return afterStatus;
+	}
+
+	public LocalDateTime getChangedAt() {
+		return changedAt;
+	}
 }

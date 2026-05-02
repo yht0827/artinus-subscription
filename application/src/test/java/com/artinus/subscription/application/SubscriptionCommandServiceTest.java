@@ -16,8 +16,10 @@ import com.artinus.subscription.application.command.CancelCommand;
 import com.artinus.subscription.application.command.SubscribeCommand;
 import com.artinus.subscription.application.port.ChannelPort;
 import com.artinus.subscription.application.port.ExternalApprovalPort;
+import com.artinus.subscription.application.port.IdempotencyPort;
 import com.artinus.subscription.application.port.MemberPort;
 import com.artinus.subscription.application.port.SubscriptionHistoryPort;
+import com.artinus.subscription.application.result.CompletedIdempotency;
 import com.artinus.subscription.application.result.SubscriptionResult;
 import com.artinus.subscription.domain.channel.Channel;
 import com.artinus.subscription.domain.history.SubscriptionHistory;
@@ -32,16 +34,18 @@ class SubscriptionCommandServiceTest {
 	private final FakeChannelPort channelPort = new FakeChannelPort();
 	private final FakeSubscriptionHistoryPort historyPort = new FakeSubscriptionHistoryPort();
 	private final FakeExternalApprovalPort externalApprovalPort = new FakeExternalApprovalPort();
+	private final FakeIdempotencyPort idempotencyPort = new FakeIdempotencyPort();
 	private final SubscriptionCommandService service = new SubscriptionCommandService(
 		memberPort,
 		channelPort,
 		historyPort,
-		externalApprovalPort
+		externalApprovalPort,
+		idempotencyPort
 	);
 
 	@Test
 	void subscribesNewMemberToBasicAndStoresHistory() {
-		SubscribeCommand command = new SubscribeCommand("010-1234-5678", 1L, SubscriptionStatus.BASIC);
+		SubscribeCommand command = new SubscribeCommand("010-1234-5678", 1L, SubscriptionStatus.BASIC, "key-1");
 
 		SubscriptionResult result = service.subscribe(command);
 
@@ -57,7 +61,7 @@ class SubscriptionCommandServiceTest {
 	@Test
 	void cancelsExistingBasicMemberToNoneAndStoresHistory() {
 		memberPort.save(Member.create("01012345678", SubscriptionStatus.BASIC));
-		CancelCommand command = new CancelCommand("01012345678", 5L, SubscriptionStatus.NONE);
+		CancelCommand command = new CancelCommand("01012345678", 5L, SubscriptionStatus.NONE, "key-2");
 
 		SubscriptionResult result = service.cancel(command);
 
@@ -70,7 +74,7 @@ class SubscriptionCommandServiceTest {
 	@Test
 	void doesNotCallExternalApprovalWhenTransitionIsInvalid() {
 		memberPort.save(Member.create("01012345678", SubscriptionStatus.BASIC));
-		SubscribeCommand command = new SubscribeCommand("01012345678", 1L, SubscriptionStatus.NONE);
+		SubscribeCommand command = new SubscribeCommand("01012345678", 1L, SubscriptionStatus.NONE, "key-3");
 
 		assertThatThrownBy(() -> service.subscribe(command))
 			.isInstanceOf(InvalidSubscriptionTransitionException.class);
@@ -82,7 +86,7 @@ class SubscriptionCommandServiceTest {
 	@Test
 	void rejectsSubscribeWhenExternalApprovalFails() {
 		externalApprovalPort.approved = false;
-		SubscribeCommand command = new SubscribeCommand("01012345678", 1L, SubscriptionStatus.BASIC);
+		SubscribeCommand command = new SubscribeCommand("01012345678", 1L, SubscriptionStatus.BASIC, "key-4");
 
 		assertThatThrownBy(() -> service.subscribe(command))
 			.isInstanceOf(ExternalApprovalRejectedException.class);
@@ -90,6 +94,46 @@ class SubscriptionCommandServiceTest {
 		assertThat(memberPort.findByPhoneNumber("01012345678"))
 			.hasValueSatisfying(member -> assertThat(member.getSubscriptionStatus()).isEqualTo(SubscriptionStatus.NONE));
 		assertThat(historyPort.histories).isEmpty();
+	}
+
+	@Test
+	void returnsStoredResultWhenSubscribeRequestIsRepeatedWithSameIdempotencyKey() {
+		SubscribeCommand command = new SubscribeCommand("01012345678", 1L, SubscriptionStatus.BASIC, "key-repeat");
+
+		SubscriptionResult first = service.subscribe(command);
+		SubscriptionResult second = service.subscribe(command);
+
+		assertThat(second).isEqualTo(first);
+		assertThat(externalApprovalPort.callCount).isEqualTo(1);
+		assertThat(historyPort.histories).hasSize(1);
+	}
+
+	@Test
+	void rejectsRepeatedSubscribeRequestWithSameIdempotencyKeyButDifferentBody() {
+		service.subscribe(new SubscribeCommand("01012345678", 1L, SubscriptionStatus.BASIC, "key-conflict"));
+
+		assertThatThrownBy(() -> service.subscribe(
+			new SubscribeCommand("01012345678", 1L, SubscriptionStatus.PREMIUM, "key-conflict")
+		)).isInstanceOf(IdempotencyConflictException.class);
+
+		assertThat(externalApprovalPort.callCount).isEqualTo(1);
+		assertThat(historyPort.histories).hasSize(1);
+	}
+
+	@Test
+	void doesNotStoreIdempotencyResultWhenExternalApprovalFails() {
+		SubscribeCommand command = new SubscribeCommand("01012345678", 1L, SubscriptionStatus.BASIC, "key-retry");
+		externalApprovalPort.approved = false;
+
+		assertThatThrownBy(() -> service.subscribe(command))
+			.isInstanceOf(ExternalApprovalRejectedException.class);
+
+		externalApprovalPort.approved = true;
+		SubscriptionResult result = service.subscribe(command);
+
+		assertThat(result.subscriptionStatus()).isEqualTo(SubscriptionStatus.BASIC);
+		assertThat(externalApprovalPort.callCount).isEqualTo(2);
+		assertThat(historyPort.histories).hasSize(1);
 	}
 
 	private static class FakeMemberPort implements MemberPort {
@@ -140,6 +184,25 @@ class SubscriptionCommandServiceTest {
 		public boolean approve() {
 			callCount++;
 			return approved;
+		}
+	}
+
+	private static class FakeIdempotencyPort implements IdempotencyPort {
+
+		private final Map<String, CompletedIdempotency> results = new HashMap<>();
+
+		@Override
+		public Optional<CompletedIdempotency> findCompleted(String phoneNumber, String idempotencyKey) {
+			return Optional.ofNullable(results.get(key(phoneNumber, idempotencyKey)));
+		}
+
+		@Override
+		public void saveCompleted(CompletedIdempotency completed) {
+			results.put(key(completed.phoneNumber(), completed.idempotencyKey()), completed);
+		}
+
+		private String key(String phoneNumber, String idempotencyKey) {
+			return phoneNumber + ":" + idempotencyKey;
 		}
 	}
 }

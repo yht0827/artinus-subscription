@@ -9,8 +9,11 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 
+import com.artinus.subscription.application.result.CompletedIdempotency;
+import com.artinus.subscription.application.result.SubscriptionResult;
 import com.artinus.subscription.domain.subscription.SubscriptionActionType;
 import com.artinus.subscription.domain.subscription.SubscriptionStatus;
+import com.artinus.subscription.infrastructure.persistence.adapter.JpaIdempotencyAdapter;
 import com.artinus.subscription.infrastructure.persistence.entity.JpaChannelEntity;
 import com.artinus.subscription.infrastructure.persistence.entity.JpaIdempotencyKeyEntity;
 import com.artinus.subscription.infrastructure.persistence.entity.JpaMemberEntity;
@@ -19,6 +22,7 @@ import com.artinus.subscription.infrastructure.persistence.repository.ChannelRep
 import com.artinus.subscription.infrastructure.persistence.repository.IdempotencyKeyRepository;
 import com.artinus.subscription.infrastructure.persistence.repository.MemberRepository;
 import com.artinus.subscription.infrastructure.persistence.repository.SubscriptionHistoryRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @DataJpaTest
 class SubscriptionPersistenceTest {
@@ -86,5 +90,19 @@ class SubscriptionPersistenceTest {
 
 		assertThat(idempotencyKeyRepository.findByPhoneNumberAndIdempotencyKey("01012345678", "request-key"))
 			.hasValueSatisfying(found -> assertThat(found.getRequestHash()).isEqualTo("request-hash"));
+	}
+
+	@Test
+	void idempotencyAdapterSavesAndFindsCompletedResult() {
+		JpaIdempotencyAdapter adapter = new JpaIdempotencyAdapter(idempotencyKeyRepository, new ObjectMapper());
+		SubscriptionResult response = new SubscriptionResult("01012345678", SubscriptionStatus.BASIC);
+
+		adapter.saveCompleted(new CompletedIdempotency("01012345678", "adapter-key", "request-hash", response));
+
+		assertThat(adapter.findCompleted("01012345678", "adapter-key"))
+			.hasValueSatisfying(found -> {
+				assertThat(found.requestHash()).isEqualTo("request-hash");
+				assertThat(found.response()).isEqualTo(response);
+			});
 	}
 }

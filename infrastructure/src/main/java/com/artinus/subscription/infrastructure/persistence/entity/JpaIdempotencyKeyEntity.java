@@ -68,4 +68,16 @@ public class JpaIdempotencyKeyEntity {
 	public String getRequestHash() {
 		return requestHash;
 	}
+
+	public String getPhoneNumber() {
+		return phoneNumber;
+	}
+
+	public String getIdempotencyKey() {
+		return idempotencyKey;
+	}
+
+	public String getResponseBody() {
+		return responseBody;
+	}
 }

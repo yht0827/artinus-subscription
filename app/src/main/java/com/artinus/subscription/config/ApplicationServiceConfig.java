@@ -3,6 +3,8 @@ package com.artinus.subscription.config;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
+import com.artinus.subscription.application.FallbackHistorySummaryService;
+import com.artinus.subscription.application.HistorySummaryPort;
 import com.artinus.subscription.application.SubscriptionCommandService;
 import com.artinus.subscription.application.SubscriptionHistoryQueryService;
 import com.artinus.subscription.application.port.ChannelPort;
@@ -22,7 +24,13 @@ public class ApplicationServiceConfig {
 	}
 
 	@Bean
-	public SubscriptionHistoryQueryService subscriptionHistoryQueryService(SubscriptionHistoryPort historyPort) {
-		return new SubscriptionHistoryQueryService(historyPort);
+	public SubscriptionHistoryQueryService subscriptionHistoryQueryService(SubscriptionHistoryPort historyPort,
+		HistorySummaryPort summaryPort) {
+		return new SubscriptionHistoryQueryService(historyPort, summaryPort);
+	}
+
+	@Bean
+	public HistorySummaryPort historySummaryPort() {
+		return new FallbackHistorySummaryService();
 	}
 }

@@ -10,18 +10,21 @@ import com.artinus.subscription.domain.member.PhoneNumber;
 public class SubscriptionHistoryQueryService {
 
 	private final SubscriptionHistoryPort historyPort;
+	private final HistorySummaryPort summaryPort;
 
-	public SubscriptionHistoryQueryService(SubscriptionHistoryPort historyPort) {
+	public SubscriptionHistoryQueryService(SubscriptionHistoryPort historyPort, HistorySummaryPort summaryPort) {
 		this.historyPort = historyPort;
+		this.summaryPort = summaryPort;
 	}
 
 	public SubscriptionHistoryResult findByPhoneNumber(String phoneNumber) {
 		String normalizedPhoneNumber = PhoneNumber.from(phoneNumber).value();
-		List<SubscriptionHistoryResult.HistoryItem> historyItems = historyPort.findByPhoneNumber(normalizedPhoneNumber)
+		List<SubscriptionHistory> histories = historyPort.findByPhoneNumber(normalizedPhoneNumber);
+		List<SubscriptionHistoryResult.HistoryItem> historyItems = histories
 			.stream()
 			.map(this::toHistoryItem)
 			.toList();
-		return new SubscriptionHistoryResult(historyItems, "");
+		return new SubscriptionHistoryResult(historyItems, summaryPort.summarize(histories));
 	}
 
 	private SubscriptionHistoryResult.HistoryItem toHistoryItem(SubscriptionHistory history) {

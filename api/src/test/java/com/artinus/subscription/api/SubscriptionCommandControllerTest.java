@@ -96,7 +96,7 @@ class SubscriptionCommandControllerTest {
 					SubscriptionStatus.BASIC,
 					LocalDateTime.of(2026, 1, 1, 10, 0)
 				)),
-				""
+				"2026년 1월 1일 홈페이지를 통해 일반 구독으로 구독하였습니다."
 			));
 
 		mockMvc.perform(get("/api/v1/subscriptions/histories")
@@ -105,6 +105,6 @@ class SubscriptionCommandControllerTest {
 			.andExpect(jsonPath("$.history[0].channelName").value("홈페이지"))
 			.andExpect(jsonPath("$.history[0].actionType").value("SUBSCRIBE"))
 			.andExpect(jsonPath("$.history[0].afterStatus").value("BASIC"))
-			.andExpect(jsonPath("$.summary").value(""));
+			.andExpect(jsonPath("$.summary").value("2026년 1월 1일 홈페이지를 통해 일반 구독으로 구독하였습니다."));
 	}
 }

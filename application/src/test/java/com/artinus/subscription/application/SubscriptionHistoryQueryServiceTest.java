@@ -19,7 +19,8 @@ import com.artinus.subscription.domain.subscription.SubscriptionStatus;
 class SubscriptionHistoryQueryServiceTest {
 
 	private final FakeSubscriptionHistoryPort historyPort = new FakeSubscriptionHistoryPort();
-	private final SubscriptionHistoryQueryService service = new SubscriptionHistoryQueryService(historyPort);
+	private final FakeHistorySummaryPort summaryPort = new FakeHistorySummaryPort();
+	private final SubscriptionHistoryQueryService service = new SubscriptionHistoryQueryService(historyPort, summaryPort);
 
 	@Test
 	void findsSubscriptionHistoriesByPhoneNumber() {
@@ -33,7 +34,7 @@ class SubscriptionHistoryQueryServiceTest {
 		assertThat(result.history()).hasSize(1);
 		assertThat(result.history().getFirst().channelName()).isEqualTo("홈페이지");
 		assertThat(result.history().getFirst().afterStatus()).isEqualTo(SubscriptionStatus.BASIC);
-		assertThat(result.summary()).isEmpty();
+		assertThat(result.summary()).isEqualTo("fallback summary");
 	}
 
 	private static class FakeSubscriptionHistoryPort implements SubscriptionHistoryPort {
@@ -50,6 +51,14 @@ class SubscriptionHistoryQueryServiceTest {
 			return histories.stream()
 				.filter(history -> history.member().getPhoneNumber().equals(phoneNumber))
 				.toList();
+		}
+	}
+
+	private static class FakeHistorySummaryPort implements HistorySummaryPort {
+
+		@Override
+		public String summarize(List<SubscriptionHistory> histories) {
+			return "fallback summary";
 		}
 	}
 }

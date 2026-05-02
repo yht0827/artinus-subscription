@@ -160,8 +160,8 @@
 - [x] csrng 외부 API client 구현
 - [x] REST API 구현
 - [x] 구독 이력 조회 구현
+- [x] LLM 요약 fallback 구현
 
 ### 예정
-- [ ] LLM 요약 fallback 구현
 - [ ] 외부 API 장애 대응 정책 정리
 - [ ] AWS 배포/운영 아키텍처 문서화

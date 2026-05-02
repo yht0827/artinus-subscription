@@ -131,3 +131,36 @@
 ## 제출 방법
 - 안내 드린 마감일 전까지 github public repository URL을 아래 메일로 회신 부탁드립니다.
   - 메일: recruit@artinus.dev
+
+---
+
+## 구현 체크리스트
+
+### 완료
+- [x] Spring Boot 프로젝트 초기 구성
+- [x] `main` / `dev` 브랜치 분리
+- [x] Gradle 멀티모듈 구조 구성
+- [x] 헥사고날 아키텍처 기본 모듈 분리
+  - [x] `domain`
+  - [x] `application`
+  - [x] `infrastructure`
+  - [x] `api`
+  - [x] `app`
+- [x] 휴대폰번호 값 객체 구현
+- [x] 구독 상태 전이 정책 구현
+- [x] Flyway 기반 DB schema 작성
+- [x] 채널 seed data 작성
+- [x] JPA 영속성 엔티티 및 repository 구성
+- [x] 영속성 테스트 작성
+- [x] application port 정의
+- [x] 구독/해지 command use case 구현
+- [x] 구독/해지 유스케이스 테스트 작성
+
+### 예정
+- [ ] Idempotency-Key 처리
+- [ ] csrng 외부 API client 구현
+- [ ] REST API 구현
+- [ ] 구독 이력 조회 구현
+- [ ] LLM 요약 fallback 구현
+- [ ] 외부 API 장애 대응 정책 정리
+- [ ] AWS 배포/운영 아키텍처 문서화

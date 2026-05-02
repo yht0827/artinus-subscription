@@ -157,9 +157,9 @@
 - [x] 구독/해지 유스케이스 테스트 작성
 - [x] Idempotency-Key 애플리케이션 정책 구현
 - [x] Idempotency-Key 영속성 adapter 연결
+- [x] csrng 외부 API client 구현
 
 ### 예정
-- [ ] csrng 외부 API client 구현
 - [ ] REST API 구현
 - [ ] 구독 이력 조회 구현
 - [ ] LLM 요약 fallback 구현

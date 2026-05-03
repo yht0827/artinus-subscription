@@ -3,7 +3,9 @@ package com.artinus.subscription.api.exception;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.web.bind.MissingRequestHeaderException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -55,6 +57,24 @@ public class GlobalExceptionHandler {
 	public ResponseEntity<ErrorResponse> handleHttpMessageNotReadableException(
 		HttpMessageNotReadableException exception) {
 		return buildResponse(HttpStatus.BAD_REQUEST, "요청 본문 형식이 올바르지 않습니다.");
+	}
+
+	@ExceptionHandler(MethodArgumentNotValidException.class)
+	public ResponseEntity<ErrorResponse> handleMethodArgumentNotValidException(
+		MethodArgumentNotValidException exception) {
+		String message = exception.getBindingResult()
+			.getFieldErrors()
+			.stream()
+			.findFirst()
+			.map(error -> error.getDefaultMessage() == null ? "요청 값이 올바르지 않습니다." : error.getDefaultMessage())
+			.orElse("요청 값이 올바르지 않습니다.");
+		return buildResponse(HttpStatus.BAD_REQUEST, message);
+	}
+
+	@ExceptionHandler(OptimisticLockingFailureException.class)
+	public ResponseEntity<ErrorResponse> handleOptimisticLockingFailureException(
+		OptimisticLockingFailureException exception) {
+		return buildResponse(HttpStatus.CONFLICT, "동시에 처리된 구독 상태 변경 요청이 있습니다. 다시 조회한 뒤 재시도해 주세요.");
 	}
 
 	@ExceptionHandler(Exception.class)

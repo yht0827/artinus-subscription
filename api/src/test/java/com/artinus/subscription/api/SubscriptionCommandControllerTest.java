@@ -14,6 +14,7 @@ import org.springframework.boot.SpringBootConfiguration;
 import org.springframework.boot.autoconfigure.EnableAutoConfiguration;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -168,5 +169,44 @@ class SubscriptionCommandControllerTest {
 			.andExpect(status().isBadRequest())
 			.andExpect(jsonPath("$.status").value(400))
 			.andExpect(jsonPath("$.message").value("요청 본문 형식이 올바르지 않습니다."));
+	}
+
+	@Test
+	void returnsBadRequestWhenRequiredRequestValueIsMissing() throws Exception {
+		// when & then
+		mockMvc.perform(post("/api/v1/subscriptions")
+				.header("Idempotency-Key", "request-key")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "channelId": 1,
+					  "targetStatus": "BASIC"
+					}
+					"""))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.status").value(400))
+			.andExpect(jsonPath("$.message").value("휴대폰번호는 필수입니다."));
+	}
+
+	@Test
+	void returnsConflictWhenSubscriptionStatusIsChangedConcurrently() throws Exception {
+		// given
+		when(subscriptionCommandUseCase.subscribe(any()))
+			.thenThrow(new OptimisticLockingFailureException("동시 수정 충돌"));
+
+		// when & then
+		mockMvc.perform(post("/api/v1/subscriptions")
+				.header("Idempotency-Key", "request-key")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "phoneNumber": "010-1234-5678",
+					  "channelId": 1,
+					  "targetStatus": "BASIC"
+					}
+					"""))
+			.andExpect(status().isConflict())
+			.andExpect(jsonPath("$.status").value(409))
+			.andExpect(jsonPath("$.message").value("동시에 처리된 구독 상태 변경 요청이 있습니다. 다시 조회한 뒤 재시도해 주세요."));
 	}
 }

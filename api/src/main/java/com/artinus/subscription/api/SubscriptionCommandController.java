@@ -16,6 +16,7 @@ import com.artinus.subscription.api.response.SubscriptionHistoryResponse;
 import com.artinus.subscription.application.port.in.SubscriptionCommandUseCase;
 import com.artinus.subscription.application.port.in.SubscriptionHistoryQueryUseCase;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -32,7 +33,7 @@ public class SubscriptionCommandController implements SubscriptionApiDocs {
 	@PostMapping
 	public ResponseEntity<SubscriptionCommandResponse> subscribe(
 		@RequestHeader("Idempotency-Key") String idempotencyKey,
-		@RequestBody SubscriptionCommandRequest request) {
+		@Valid @RequestBody SubscriptionCommandRequest request) {
 		log.info("구독 신청 요청 수신: channelId={}, targetStatus={}", request.channelId(), request.targetStatus());
 		return ResponseEntity.ok(SubscriptionCommandResponse.from(
 			subscriptionCommandUseCase.subscribe(request.toSubscribeCommand(idempotencyKey))
@@ -43,7 +44,7 @@ public class SubscriptionCommandController implements SubscriptionApiDocs {
 	@PostMapping("/cancel")
 	public ResponseEntity<SubscriptionCommandResponse> cancel(
 		@RequestHeader("Idempotency-Key") String idempotencyKey,
-		@RequestBody SubscriptionCommandRequest request) {
+		@Valid @RequestBody SubscriptionCommandRequest request) {
 		log.info("구독 해지 요청 수신: channelId={}, targetStatus={}", request.channelId(), request.targetStatus());
 		return ResponseEntity.ok(SubscriptionCommandResponse.from(
 			subscriptionCommandUseCase.cancel(request.toCancelCommand(idempotencyKey))

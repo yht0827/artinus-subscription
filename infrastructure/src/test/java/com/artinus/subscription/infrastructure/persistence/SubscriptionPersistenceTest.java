@@ -7,7 +7,10 @@ import java.util.List;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 
 import com.artinus.subscription.application.result.CompletedIdempotency;
 import com.artinus.subscription.application.result.SubscriptionResult;
@@ -16,6 +19,7 @@ import com.artinus.subscription.domain.history.SubscriptionHistory;
 import com.artinus.subscription.domain.member.Member;
 import com.artinus.subscription.domain.subscription.SubscriptionActionType;
 import com.artinus.subscription.domain.subscription.SubscriptionStatus;
+import com.artinus.subscription.infrastructure.TestcontainersConfiguration;
 import com.artinus.subscription.infrastructure.persistence.adapter.JpaChannelAdapter;
 import com.artinus.subscription.infrastructure.persistence.adapter.JpaIdempotencyAdapter;
 import com.artinus.subscription.infrastructure.persistence.adapter.JpaMemberAdapter;
@@ -31,7 +35,13 @@ import com.artinus.subscription.infrastructure.persistence.repository.Subscripti
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 @DataJpaTest
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
 class SubscriptionPersistenceTest {
+
+	@DynamicPropertySource
+	static void configureDatasource(DynamicPropertyRegistry registry) {
+		TestcontainersConfiguration.startMysql(registry);
+	}
 
 	@Autowired
 	private MemberRepository memberRepository;

@@ -9,5 +9,6 @@ dependencies {
 	implementation 'org.springframework:spring-web'
 	runtimeOnly 'com.mysql:mysql-connector-j'
 
-	testRuntimeOnly 'com.h2database:h2'
+	testImplementation 'org.testcontainers:junit-jupiter'
+	testImplementation 'org.testcontainers:mysql'
 }

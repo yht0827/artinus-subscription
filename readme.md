@@ -163,6 +163,42 @@
 
 ---
 
+## 로컬 실행 방법
+
+### MySQL 실행
+
+애플리케이션 기본 설정은 로컬 MySQL을 사용합니다.
+
+```bash
+docker compose up -d mysql
+```
+
+기본 접속 정보:
+- host: `localhost`
+- port: `3306`
+- database: `artinus_subscription`
+- username: `root`
+- password: `password`
+
+### 애플리케이션 실행
+
+```bash
+./gradlew :app:bootRun
+```
+
+Flyway가 실행 시점에 schema와 채널 seed data를 반영합니다.
+
+### 테스트 실행
+
+DB 통합 테스트는 실제 MySQL과의 차이를 줄이기 위해 Testcontainers 기반 MySQL을 사용합니다.
+테스트 실행 전 Docker 또는 OrbStack이 실행 중이어야 합니다.
+
+```bash
+./gradlew test
+```
+
+---
+
 ## 제출 방법
 - 안내 드린 마감일 전까지 github public repository URL을 아래 메일로 회신 부탁드립니다.
   - 메일: recruit@artinus.dev
@@ -197,6 +233,8 @@
 - [x] 구독 이력 조회 구현
 - [x] LLM 요약 fallback 구현
 - [x] 외부 API 장애 대응 정책 정리
+- [x] 로컬 MySQL docker compose 구성
+- [x] DB 통합 테스트 MySQL Testcontainers 적용
 
 ### 예정
 - [ ] AWS 배포/운영 아키텍처 문서화

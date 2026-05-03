@@ -1,0 +1,77 @@
+@baseUrl = http://localhost:8080
+@phoneNumber = 010-1234-5678
+
+### Swagger UI
+GET {{baseUrl}}/swagger-ui.html
+
+### OpenAPI JSON
+GET {{baseUrl}}/v3/api-docs
+
+### Subscribe BASIC from homepage
+POST {{baseUrl}}/api/v1/subscriptions
+Content-Type: application/json
+Idempotency-Key: subscribe-basic-{{$timestamp}}
+
+{
+  "phoneNumber": "{{phoneNumber}}",
+  "channelId": 1,
+  "targetStatus": "BASIC"
+}
+
+### Subscribe PREMIUM from homepage
+POST {{baseUrl}}/api/v1/subscriptions
+Content-Type: application/json
+Idempotency-Key: subscribe-premium-{{$timestamp}}
+
+{
+  "phoneNumber": "{{phoneNumber}}",
+  "channelId": 1,
+  "targetStatus": "PREMIUM"
+}
+
+### Cancel PREMIUM to BASIC from call center
+POST {{baseUrl}}/api/v1/subscriptions/cancel
+Content-Type: application/json
+Idempotency-Key: cancel-to-basic-{{$timestamp}}
+
+{
+  "phoneNumber": "{{phoneNumber}}",
+  "channelId": 5,
+  "targetStatus": "BASIC"
+}
+
+### Cancel BASIC to NONE from call center
+POST {{baseUrl}}/api/v1/subscriptions/cancel
+Content-Type: application/json
+Idempotency-Key: cancel-to-none-{{$timestamp}}
+
+{
+  "phoneNumber": "{{phoneNumber}}",
+  "channelId": 5,
+  "targetStatus": "NONE"
+}
+
+### Find subscription histories
+GET {{baseUrl}}/api/v1/subscriptions/histories?phoneNumber={{phoneNumber}}
+
+### Idempotency repeat with same key and same body
+POST {{baseUrl}}/api/v1/subscriptions
+Content-Type: application/json
+Idempotency-Key: repeat-same-key
+
+{
+  "phoneNumber": "010-9999-0000",
+  "channelId": 1,
+  "targetStatus": "BASIC"
+}
+
+### Idempotency conflict with same key and different body
+POST {{baseUrl}}/api/v1/subscriptions
+Content-Type: application/json
+Idempotency-Key: repeat-same-key
+
+{
+  "phoneNumber": "010-9999-0000",
+  "channelId": 1,
+  "targetStatus": "PREMIUM"
+}

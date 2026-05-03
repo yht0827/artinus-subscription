@@ -141,6 +141,7 @@
 - 같은 요청이 재시도될 수 있으므로 `Idempotency-Key`를 사용합니다.
 - 성공한 요청만 멱등성 완료 결과로 저장합니다.
 - 외부 API 실패 또는 거절은 완료 결과로 저장하지 않아, 같은 키로 재시도할 수 있습니다.
+- Redis는 현재 요구사항에서는 사용하지 않습니다. 멱등성은 DB unique constraint와 상태 테이블로 보장하고, Redis는 TTL 기반 멱등성 저장소나 분산 락이 필요한 규모에서 도입하는 것을 기준으로 합니다.
 
 ### 트랜잭션 경계
 - 도메인 검증과 채널 권한 검증을 먼저 수행합니다.
@@ -160,6 +161,7 @@
 - 장애율이 높아지면 circuit breaker로 외부 API 호출을 빠르게 실패시켜 DB와 WAS 자원을 보호합니다.
 - 외부 API latency, 실패율, timeout 수, fallback 사용 횟수를 metric으로 수집합니다.
 - 장애 상황 분석을 위해 요청 ID, `Idempotency-Key`, 외부 API 응답 상태를 로그에 남기되 개인정보와 API key는 기록하지 않습니다.
+- `idempotency_keys` 만료 데이터 정리와 구독 이력 아카이빙은 운영 보관 정책이 확정된 뒤 별도 배치/스케줄러로 분리합니다.
 
 ---
 
@@ -232,9 +234,17 @@ DB 통합 테스트는 실제 MySQL과의 차이를 줄이기 위해 Testcontain
 - [x] REST API 구현
 - [x] 구독 이력 조회 구현
 - [x] LLM 요약 fallback 구현
+- [x] OpenAI 기반 LLM 요약 연동
+- [x] OpenAI 요약 호출 로그 추가
 - [x] 외부 API 장애 대응 정책 정리
+- [x] 외부 API timeout 설정 적용
+- [x] 외부 API retry / circuit breaker 적용
+- [x] 구독 상태 변경 동시성 충돌 응답 처리
+- [x] 요청 validation / JSON 파싱 예외 응답 처리
 - [x] 로컬 MySQL docker compose 구성
 - [x] DB 통합 테스트 MySQL Testcontainers 적용
 
 ### 예정
+- [ ] Idempotency-Key 만료 데이터 정리 정책 구현
+- [ ] 구독 이력 아카이빙 정책 구체화
 - [ ] AWS 배포/운영 아키텍처 문서화

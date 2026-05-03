@@ -1,13 +1,13 @@
 @baseUrl = http://localhost:8080
 @phoneNumber = 010-1234-5678
 
-### Swagger UI
+### Swagger UI 확인
 GET {{baseUrl}}/swagger-ui.html
 
-### OpenAPI JSON
+### OpenAPI JSON 확인
 GET {{baseUrl}}/v3/api-docs
 
-### Subscribe BASIC from homepage
+### 홈페이지에서 일반 구독 신청
 POST {{baseUrl}}/api/v1/subscriptions
 Content-Type: application/json
 Idempotency-Key: subscribe-basic-{{$timestamp}}
@@ -18,7 +18,7 @@ Idempotency-Key: subscribe-basic-{{$timestamp}}
   "targetStatus": "BASIC"
 }
 
-### Subscribe PREMIUM from homepage
+### 홈페이지에서 프리미엄 구독 신청
 POST {{baseUrl}}/api/v1/subscriptions
 Content-Type: application/json
 Idempotency-Key: subscribe-premium-{{$timestamp}}
@@ -29,7 +29,7 @@ Idempotency-Key: subscribe-premium-{{$timestamp}}
   "targetStatus": "PREMIUM"
 }
 
-### Cancel PREMIUM to BASIC from call center
+### 콜센터에서 프리미엄 구독을 일반 구독으로 해지
 POST {{baseUrl}}/api/v1/subscriptions/cancel
 Content-Type: application/json
 Idempotency-Key: cancel-to-basic-{{$timestamp}}
@@ -40,7 +40,7 @@ Idempotency-Key: cancel-to-basic-{{$timestamp}}
   "targetStatus": "BASIC"
 }
 
-### Cancel BASIC to NONE from call center
+### 콜센터에서 일반 구독을 구독 안함으로 해지
 POST {{baseUrl}}/api/v1/subscriptions/cancel
 Content-Type: application/json
 Idempotency-Key: cancel-to-none-{{$timestamp}}
@@ -51,10 +51,10 @@ Idempotency-Key: cancel-to-none-{{$timestamp}}
   "targetStatus": "NONE"
 }
 
-### Find subscription histories
+### 구독 이력 조회
 GET {{baseUrl}}/api/v1/subscriptions/histories?phoneNumber={{phoneNumber}}
 
-### Idempotency repeat with same key and same body
+### 멱등성 확인 - 같은 키와 같은 요청 본문 반복
 POST {{baseUrl}}/api/v1/subscriptions
 Content-Type: application/json
 Idempotency-Key: repeat-same-key
@@ -65,7 +65,7 @@ Idempotency-Key: repeat-same-key
   "targetStatus": "BASIC"
 }
 
-### Idempotency conflict with same key and different body
+### 멱등성 충돌 확인 - 같은 키와 다른 요청 본문
 POST {{baseUrl}}/api/v1/subscriptions
 Content-Type: application/json
 Idempotency-Key: repeat-same-key

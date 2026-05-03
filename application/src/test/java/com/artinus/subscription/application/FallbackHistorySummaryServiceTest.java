@@ -1,12 +1,13 @@
 package com.artinus.subscription.application;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.*;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
 import org.junit.jupiter.api.Test;
 
+import com.artinus.subscription.application.summary.FallbackHistorySummaryService;
 import com.artinus.subscription.domain.channel.Channel;
 import com.artinus.subscription.domain.history.SubscriptionHistory;
 import com.artinus.subscription.domain.member.Member;
@@ -19,6 +20,7 @@ class FallbackHistorySummaryServiceTest {
 
 	@Test
 	void summarizesHistoriesInKorean() {
+		// given
 		Member member = Member.create("01012345678", SubscriptionStatus.NONE);
 		List<SubscriptionHistory> histories = List.of(
 			SubscriptionHistory.record(member, new Channel(1L, "홈페이지", true, true),
@@ -29,8 +31,10 @@ class FallbackHistorySummaryServiceTest {
 				LocalDateTime.of(2026, 2, 1, 10, 0))
 		);
 
+		// when
 		String summary = service.summarize(histories);
 
+		// then
 		assertThat(summary).isEqualTo(
 			"2026년 1월 1일 홈페이지를 통해 일반 구독으로 구독하였습니다. "
 				+ "2026년 2월 1일 콜센터를 통해 구독 안함으로 구독 해지하였습니다."
@@ -39,6 +43,7 @@ class FallbackHistorySummaryServiceTest {
 
 	@Test
 	void returnsEmptyMessageWhenHistoryDoesNotExist() {
+		// when & then
 		assertThat(service.summarize(List.of())).isEqualTo("구독 이력이 없습니다.");
 	}
 }

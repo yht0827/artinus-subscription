@@ -1,4 +1,4 @@
-package com.artinus.subscription.application.port;
+package com.artinus.subscription.application.port.out;
 
 import java.util.Optional;
 

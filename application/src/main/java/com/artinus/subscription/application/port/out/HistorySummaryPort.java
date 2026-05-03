@@ -1,4 +1,4 @@
-package com.artinus.subscription.application;
+package com.artinus.subscription.application.port.out;
 
 import java.util.List;
 

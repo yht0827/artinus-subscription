@@ -1,9 +1,7 @@
 package com.artinus.subscription.application;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.*;
 
-import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -14,17 +12,21 @@ import org.junit.jupiter.api.Test;
 
 import com.artinus.subscription.application.command.CancelCommand;
 import com.artinus.subscription.application.command.SubscribeCommand;
-import com.artinus.subscription.application.port.ChannelPort;
-import com.artinus.subscription.application.port.ExternalApprovalPort;
-import com.artinus.subscription.application.port.IdempotencyPort;
-import com.artinus.subscription.application.port.MemberPort;
-import com.artinus.subscription.application.port.SubscriptionHistoryPort;
+import com.artinus.subscription.application.exception.ExternalApprovalRejectedException;
+import com.artinus.subscription.application.exception.IdempotencyConflictException;
+import com.artinus.subscription.application.idempotency.IdempotencyProcessor;
+import com.artinus.subscription.application.port.out.ChannelPort;
+import com.artinus.subscription.application.port.out.ExternalApprovalPort;
+import com.artinus.subscription.application.port.out.IdempotencyPort;
+import com.artinus.subscription.application.port.out.MemberPort;
+import com.artinus.subscription.application.port.out.SubscriptionHistoryPort;
 import com.artinus.subscription.application.result.CompletedIdempotency;
 import com.artinus.subscription.application.result.SubscriptionResult;
+import com.artinus.subscription.application.service.SubscriptionCommandService;
 import com.artinus.subscription.domain.channel.Channel;
+import com.artinus.subscription.domain.exception.InvalidSubscriptionTransitionException;
 import com.artinus.subscription.domain.history.SubscriptionHistory;
 import com.artinus.subscription.domain.member.Member;
-import com.artinus.subscription.domain.subscription.InvalidSubscriptionTransitionException;
 import com.artinus.subscription.domain.subscription.SubscriptionActionType;
 import com.artinus.subscription.domain.subscription.SubscriptionStatus;
 
@@ -35,24 +37,29 @@ class SubscriptionCommandServiceTest {
 	private final FakeSubscriptionHistoryPort historyPort = new FakeSubscriptionHistoryPort();
 	private final FakeExternalApprovalPort externalApprovalPort = new FakeExternalApprovalPort();
 	private final FakeIdempotencyPort idempotencyPort = new FakeIdempotencyPort();
+	private final IdempotencyProcessor idempotencyProcessor = new IdempotencyProcessor(idempotencyPort);
 	private final SubscriptionCommandService service = new SubscriptionCommandService(
 		memberPort,
 		channelPort,
 		historyPort,
 		externalApprovalPort,
-		idempotencyPort
+		idempotencyProcessor
 	);
 
 	@Test
 	void subscribesNewMemberToBasicAndStoresHistory() {
+		// given
 		SubscribeCommand command = new SubscribeCommand("010-1234-5678", 1L, SubscriptionStatus.BASIC, "key-1");
 
+		// when
 		SubscriptionResult result = service.subscribe(command);
 
+		// then
 		assertThat(result.phoneNumber()).isEqualTo("01012345678");
 		assertThat(result.subscriptionStatus()).isEqualTo(SubscriptionStatus.BASIC);
 		assertThat(memberPort.findByPhoneNumber("01012345678"))
-			.hasValueSatisfying(member -> assertThat(member.getSubscriptionStatus()).isEqualTo(SubscriptionStatus.BASIC));
+			.hasValueSatisfying(
+				member -> assertThat(member.getSubscriptionStatus()).isEqualTo(SubscriptionStatus.BASIC));
 		assertThat(historyPort.histories)
 			.extracting(SubscriptionHistory::actionType)
 			.containsExactly(SubscriptionActionType.SUBSCRIBE);
@@ -60,11 +67,14 @@ class SubscriptionCommandServiceTest {
 
 	@Test
 	void cancelsExistingBasicMemberToNoneAndStoresHistory() {
+		// given
 		memberPort.save(Member.create("01012345678", SubscriptionStatus.BASIC));
 		CancelCommand command = new CancelCommand("01012345678", 5L, SubscriptionStatus.NONE, "key-2");
 
+		// when
 		SubscriptionResult result = service.cancel(command);
 
+		// then
 		assertThat(result.subscriptionStatus()).isEqualTo(SubscriptionStatus.NONE);
 		assertThat(historyPort.histories)
 			.extracting(SubscriptionHistory::actionType)
@@ -73,9 +83,11 @@ class SubscriptionCommandServiceTest {
 
 	@Test
 	void doesNotCallExternalApprovalWhenTransitionIsInvalid() {
+		// given
 		memberPort.save(Member.create("01012345678", SubscriptionStatus.BASIC));
 		SubscribeCommand command = new SubscribeCommand("01012345678", 1L, SubscriptionStatus.NONE, "key-3");
 
+		// when & then
 		assertThatThrownBy(() -> service.subscribe(command))
 			.isInstanceOf(InvalidSubscriptionTransitionException.class);
 
@@ -85,24 +97,30 @@ class SubscriptionCommandServiceTest {
 
 	@Test
 	void rejectsSubscribeWhenExternalApprovalFails() {
+		// given
 		externalApprovalPort.approved = false;
 		SubscribeCommand command = new SubscribeCommand("01012345678", 1L, SubscriptionStatus.BASIC, "key-4");
 
+		// when & then
 		assertThatThrownBy(() -> service.subscribe(command))
 			.isInstanceOf(ExternalApprovalRejectedException.class);
 
 		assertThat(memberPort.findByPhoneNumber("01012345678"))
-			.hasValueSatisfying(member -> assertThat(member.getSubscriptionStatus()).isEqualTo(SubscriptionStatus.NONE));
+			.hasValueSatisfying(
+				member -> assertThat(member.getSubscriptionStatus()).isEqualTo(SubscriptionStatus.NONE));
 		assertThat(historyPort.histories).isEmpty();
 	}
 
 	@Test
 	void returnsStoredResultWhenSubscribeRequestIsRepeatedWithSameIdempotencyKey() {
+		// given
 		SubscribeCommand command = new SubscribeCommand("01012345678", 1L, SubscriptionStatus.BASIC, "key-repeat");
 
+		// when
 		SubscriptionResult first = service.subscribe(command);
 		SubscriptionResult second = service.subscribe(command);
 
+		// then
 		assertThat(second).isEqualTo(first);
 		assertThat(externalApprovalPort.callCount).isEqualTo(1);
 		assertThat(historyPort.histories).hasSize(1);
@@ -110,8 +128,10 @@ class SubscriptionCommandServiceTest {
 
 	@Test
 	void rejectsRepeatedSubscribeRequestWithSameIdempotencyKeyButDifferentBody() {
+		// given
 		service.subscribe(new SubscribeCommand("01012345678", 1L, SubscriptionStatus.BASIC, "key-conflict"));
 
+		// when & then
 		assertThatThrownBy(() -> service.subscribe(
 			new SubscribeCommand("01012345678", 1L, SubscriptionStatus.PREMIUM, "key-conflict")
 		)).isInstanceOf(IdempotencyConflictException.class);
@@ -122,15 +142,19 @@ class SubscriptionCommandServiceTest {
 
 	@Test
 	void doesNotStoreIdempotencyResultWhenExternalApprovalFails() {
+		// given
 		SubscribeCommand command = new SubscribeCommand("01012345678", 1L, SubscriptionStatus.BASIC, "key-retry");
 		externalApprovalPort.approved = false;
 
+		// when & then
 		assertThatThrownBy(() -> service.subscribe(command))
 			.isInstanceOf(ExternalApprovalRejectedException.class);
 
+		// when
 		externalApprovalPort.approved = true;
 		SubscriptionResult result = service.subscribe(command);
 
+		// then
 		assertThat(result.subscriptionStatus()).isEqualTo(SubscriptionStatus.BASIC);
 		assertThat(externalApprovalPort.callCount).isEqualTo(2);
 		assertThat(historyPort.histories).hasSize(1);

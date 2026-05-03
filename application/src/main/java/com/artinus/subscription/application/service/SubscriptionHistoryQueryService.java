@@ -1,22 +1,26 @@
-package com.artinus.subscription.application;
+package com.artinus.subscription.application.service;
 
 import java.util.List;
 
-import com.artinus.subscription.application.port.SubscriptionHistoryPort;
+import org.springframework.transaction.annotation.Transactional;
+
+import com.artinus.subscription.application.port.in.SubscriptionHistoryQueryUseCase;
+import com.artinus.subscription.application.port.out.HistorySummaryPort;
+import com.artinus.subscription.application.port.out.SubscriptionHistoryPort;
 import com.artinus.subscription.application.result.SubscriptionHistoryResult;
 import com.artinus.subscription.domain.history.SubscriptionHistory;
 import com.artinus.subscription.domain.member.PhoneNumber;
 
-public class SubscriptionHistoryQueryService {
+import lombok.RequiredArgsConstructor;
+
+@RequiredArgsConstructor
+public class SubscriptionHistoryQueryService implements SubscriptionHistoryQueryUseCase {
 
 	private final SubscriptionHistoryPort historyPort;
 	private final HistorySummaryPort summaryPort;
 
-	public SubscriptionHistoryQueryService(SubscriptionHistoryPort historyPort, HistorySummaryPort summaryPort) {
-		this.historyPort = historyPort;
-		this.summaryPort = summaryPort;
-	}
-
+	@Override
+	@Transactional(readOnly = true)
 	public SubscriptionHistoryResult findByPhoneNumber(String phoneNumber) {
 		String normalizedPhoneNumber = PhoneNumber.from(phoneNumber).value();
 		List<SubscriptionHistory> histories = historyPort.findByPhoneNumber(normalizedPhoneNumber);

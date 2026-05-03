@@ -199,6 +199,17 @@ DB 통합 테스트는 실제 MySQL과의 차이를 줄이기 위해 Testcontain
 ./gradlew test
 ```
 
+### k6 스모크 부하 테스트
+
+애플리케이션 실행 후 health check와 구독 이력 조회 경로를 낮은 부하로 확인합니다.
+구독/해지 명령 API는 CSRNG 외부 API와 DB 상태 변경이 포함되므로 스모크 부하 테스트 대상에서 제외했습니다.
+
+```bash
+BASE_URL=http://localhost:8080 PHONE_NUMBER=010-7777-2214 k6 run k6/subscription-smoke.js
+```
+
+최종 수동 검증 결과는 [docs/verification/manual-test-2026-05-03.md](docs/verification/manual-test-2026-05-03.md)에 정리했습니다.
+
 ---
 
 ## 제출 방법
@@ -243,6 +254,9 @@ DB 통합 테스트는 실제 MySQL과의 차이를 줄이기 위해 Testcontain
 - [x] 요청 validation / JSON 파싱 예외 응답 처리
 - [x] 로컬 MySQL docker compose 구성
 - [x] DB 통합 테스트 MySQL Testcontainers 적용
+- [x] GitHub Actions Gradle 테스트 워크플로 구성
+- [x] k6 스모크 부하 테스트 스크립트 작성
+- [x] 최종 수동 검증 결과 정리
 
 ### 예정
 - [ ] Idempotency-Key 만료 데이터 정리 정책 구현

@@ -47,6 +47,7 @@ public class ApplicationServiceConfig {
 			return fallbackSummaryPort;
 		}
 		return new OpenAiHistorySummaryClient(restClientBuilder, fallbackSummaryPort, llmProperties.apiKey(),
-			llmProperties.model(), llmProperties.maxOutputTokens());
+			llmProperties.model(), llmProperties.maxOutputTokens(), llmProperties.connectTimeout(),
+			llmProperties.readTimeout());
 	}
 }

@@ -31,8 +31,10 @@ class OpenAiHistorySummaryClientTest {
 	void setUp() {
 		RestClient.Builder builder = RestClient.builder();
 		server = MockRestServiceServer.bindTo(builder).build();
-		client = new OpenAiHistorySummaryClient(builder, new FakeFallbackSummaryPort(), "test-api-key",
-			"gpt-4.1-mini", 180);
+		client = new OpenAiHistorySummaryClient(builder.baseUrl("https://api.openai.com")
+			.defaultHeader("Authorization", "Bearer test-api-key")
+			.build(),
+			new FakeFallbackSummaryPort(), "gpt-4.1-mini", 180);
 	}
 
 	@Test

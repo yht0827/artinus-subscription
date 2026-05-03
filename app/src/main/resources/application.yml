@@ -23,3 +23,5 @@ llm:
   api-key: ${OPENAI_API_KEY:}
   model: ${OPENAI_MODEL:gpt-4.1-mini}
   max-output-tokens: ${OPENAI_MAX_OUTPUT_TOKENS:180}
+  connect-timeout: ${OPENAI_CONNECT_TIMEOUT:1s}
+  read-timeout: ${OPENAI_READ_TIMEOUT:5s}

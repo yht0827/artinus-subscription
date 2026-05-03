@@ -1,7 +1,9 @@
 package com.artinus.subscription.infrastructure.llm;
 
+import java.time.Duration;
 import java.util.List;
 
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
 
@@ -23,11 +25,21 @@ public class OpenAiHistorySummaryClient implements HistorySummaryPort {
 	private final String model;
 
 	public OpenAiHistorySummaryClient(RestClient.Builder restClientBuilder, HistorySummaryPort fallbackSummaryPort,
-		String apiKey, String model, int maxOutputTokens) {
+		String apiKey, String model, int maxOutputTokens, Duration connectTimeout, Duration readTimeout) {
 		this.restClient = restClientBuilder
 			.baseUrl("https://api.openai.com")
 			.defaultHeader("Authorization", "Bearer " + apiKey)
+			.requestFactory(requestFactory(connectTimeout, readTimeout))
 			.build();
+		this.fallbackSummaryPort = fallbackSummaryPort;
+		this.requestFactory = new OpenAiHistorySummaryRequestFactory(model, maxOutputTokens);
+		this.responseTextExtractor = new OpenAiResponseTextExtractor();
+		this.model = model;
+	}
+
+	OpenAiHistorySummaryClient(RestClient restClient, HistorySummaryPort fallbackSummaryPort, String model,
+		int maxOutputTokens) {
+		this.restClient = restClient;
 		this.fallbackSummaryPort = fallbackSummaryPort;
 		this.requestFactory = new OpenAiHistorySummaryRequestFactory(model, maxOutputTokens);
 		this.responseTextExtractor = new OpenAiResponseTextExtractor();
@@ -64,5 +76,12 @@ public class OpenAiHistorySummaryClient implements HistorySummaryPort {
 
 	private String fallback(List<SubscriptionHistory> histories) {
 		return fallbackSummaryPort.summarize(histories);
+	}
+
+	private SimpleClientHttpRequestFactory requestFactory(Duration connectTimeout, Duration readTimeout) {
+		SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+		requestFactory.setConnectTimeout(connectTimeout);
+		requestFactory.setReadTimeout(readTimeout);
+		return requestFactory;
 	}
 }

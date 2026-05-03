@@ -16,3 +16,11 @@ external:
     url: https://csrng.net/csrng/csrng.php?min=0&max=1
     connect-timeout: 1s
     read-timeout: 2s
+
+llm:
+  enabled: false
+  api-key:
+  model: gpt-4.1-mini
+  max-output-tokens: 180
+  connect-timeout: 1s
+  read-timeout: 5s

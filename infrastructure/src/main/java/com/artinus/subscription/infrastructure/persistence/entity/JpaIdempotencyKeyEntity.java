@@ -10,9 +10,14 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 @Entity
 @Table(name = "idempotency_keys")
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class JpaIdempotencyKeyEntity {
 
 	@Id
@@ -44,9 +49,6 @@ public class JpaIdempotencyKeyEntity {
 	@Column(name = "completed_at")
 	private LocalDateTime completedAt;
 
-	protected JpaIdempotencyKeyEntity() {
-	}
-
 	private JpaIdempotencyKeyEntity(String phoneNumber, String idempotencyKey, String requestHash, String responseBody,
 		Integer statusCode) {
 		LocalDateTime now = LocalDateTime.now();
@@ -65,19 +67,4 @@ public class JpaIdempotencyKeyEntity {
 		return new JpaIdempotencyKeyEntity(phoneNumber, idempotencyKey, requestHash, responseBody, statusCode);
 	}
 
-	public String getRequestHash() {
-		return requestHash;
-	}
-
-	public String getPhoneNumber() {
-		return phoneNumber;
-	}
-
-	public String getIdempotencyKey() {
-		return idempotencyKey;
-	}
-
-	public String getResponseBody() {
-		return responseBody;
-	}
 }

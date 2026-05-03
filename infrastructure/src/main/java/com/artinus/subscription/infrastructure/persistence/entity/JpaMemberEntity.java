@@ -2,8 +2,9 @@ package com.artinus.subscription.infrastructure.persistence.entity;
 
 import java.time.LocalDateTime;
 
-import com.artinus.subscription.domain.member.PhoneNumber;
+import com.artinus.subscription.domain.exception.RequiredSubscriptionStatusException;
 import com.artinus.subscription.domain.member.Member;
+import com.artinus.subscription.domain.member.PhoneNumber;
 import com.artinus.subscription.domain.subscription.SubscriptionStatus;
 
 import jakarta.persistence.Column;
@@ -17,9 +18,14 @@ import jakarta.persistence.PrePersist;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 @Entity
 @Table(name = "members")
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class JpaMemberEntity {
 
 	@Id
@@ -43,9 +49,6 @@ public class JpaMemberEntity {
 	@Column(name = "updated_at", nullable = false)
 	private LocalDateTime updatedAt;
 
-	protected JpaMemberEntity() {
-	}
-
 	private JpaMemberEntity(String phoneNumber, SubscriptionStatus subscriptionStatus) {
 		this.phoneNumber = PhoneNumber.from(phoneNumber).value();
 		this.subscriptionStatus = subscriptionStatus;
@@ -53,7 +56,7 @@ public class JpaMemberEntity {
 
 	public static JpaMemberEntity create(String phoneNumber, SubscriptionStatus subscriptionStatus) {
 		if (subscriptionStatus == null) {
-			throw new IllegalArgumentException("Subscription status is required.");
+			throw new RequiredSubscriptionStatusException();
 		}
 		return new JpaMemberEntity(phoneNumber, subscriptionStatus);
 	}
@@ -62,21 +65,9 @@ public class JpaMemberEntity {
 		return create(member.getPhoneNumber(), member.getSubscriptionStatus());
 	}
 
-	public Long getId() {
-		return id;
-	}
-
-	public String getPhoneNumber() {
-		return phoneNumber;
-	}
-
-	public SubscriptionStatus getSubscriptionStatus() {
-		return subscriptionStatus;
-	}
-
 	public void changeStatus(SubscriptionStatus subscriptionStatus) {
 		if (subscriptionStatus == null) {
-			throw new IllegalArgumentException("Subscription status is required.");
+			throw new RequiredSubscriptionStatusException();
 		}
 		this.subscriptionStatus = subscriptionStatus;
 	}

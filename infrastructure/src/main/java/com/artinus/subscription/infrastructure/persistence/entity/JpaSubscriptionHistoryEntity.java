@@ -16,9 +16,14 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 
 @Entity
 @Table(name = "subscription_histories")
+@Getter
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class JpaSubscriptionHistoryEntity {
 
 	@Id
@@ -48,10 +53,8 @@ public class JpaSubscriptionHistoryEntity {
 	@Column(name = "changed_at", nullable = false)
 	private LocalDateTime changedAt;
 
-	protected JpaSubscriptionHistoryEntity() {
-	}
-
-	private JpaSubscriptionHistoryEntity(JpaMemberEntity member, JpaChannelEntity channel, SubscriptionActionType actionType,
+	private JpaSubscriptionHistoryEntity(JpaMemberEntity member, JpaChannelEntity channel,
+		SubscriptionActionType actionType,
 		SubscriptionStatus beforeStatus, SubscriptionStatus afterStatus, LocalDateTime changedAt) {
 		this.member = member;
 		this.channel = channel;
@@ -61,32 +64,10 @@ public class JpaSubscriptionHistoryEntity {
 		this.changedAt = changedAt;
 	}
 
-	public static JpaSubscriptionHistoryEntity record(JpaMemberEntity member, JpaChannelEntity channel, SubscriptionActionType actionType,
-		SubscriptionStatus beforeStatus, SubscriptionStatus afterStatus, LocalDateTime changedAt) {
+	public static JpaSubscriptionHistoryEntity record(JpaMemberEntity member, JpaChannelEntity channel,
+		SubscriptionActionType actionType, SubscriptionStatus beforeStatus, SubscriptionStatus afterStatus,
+		LocalDateTime changedAt) {
 		return new JpaSubscriptionHistoryEntity(member, channel, actionType, beforeStatus, afterStatus, changedAt);
 	}
 
-	public SubscriptionActionType getActionType() {
-		return actionType;
-	}
-
-	public JpaMemberEntity getMember() {
-		return member;
-	}
-
-	public JpaChannelEntity getChannel() {
-		return channel;
-	}
-
-	public SubscriptionStatus getBeforeStatus() {
-		return beforeStatus;
-	}
-
-	public SubscriptionStatus getAfterStatus() {
-		return afterStatus;
-	}
-
-	public LocalDateTime getChangedAt() {
-		return changedAt;
-	}
 }

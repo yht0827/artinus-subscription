@@ -1,6 +1,6 @@
 package com.artinus.subscription.infrastructure.persistence;
 
-import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.*;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -47,8 +47,10 @@ class SubscriptionPersistenceTest {
 
 	@Test
 	void loadsSeededChannels() {
+		// when
 		List<JpaChannelEntity> channels = channelRepository.findAll();
 
+		// then
 		assertThat(channels).hasSize(6);
 		assertThat(channels)
 			.extracting(JpaChannelEntity::getName)
@@ -57,26 +59,34 @@ class SubscriptionPersistenceTest {
 
 	@Test
 	void savesAndFindsMemberByPhoneNumber() {
+		// given
 		JpaMemberEntity member = JpaMemberEntity.create("01012345678", SubscriptionStatus.NONE);
+
+		// when
 		memberRepository.save(member);
 
+		// then
 		assertThat(memberRepository.findByPhoneNumber("01012345678"))
 			.hasValueSatisfying(found -> assertThat(found.getSubscriptionStatus()).isEqualTo(SubscriptionStatus.NONE));
 	}
 
 	@Test
 	void savesSubscriptionHistoryAndFindsByMemberIdOrderedByChangedAt() {
+		// given
 		JpaMemberEntity member = memberRepository.save(JpaMemberEntity.create("01012345678", SubscriptionStatus.NONE));
 		JpaChannelEntity homepage = channelRepository.findByName("홈페이지").orElseThrow();
 		JpaChannelEntity callCenter = channelRepository.findByName("콜센터").orElseThrow();
 
+		// when
 		historyRepository.save(JpaSubscriptionHistoryEntity.record(member, homepage, SubscriptionActionType.SUBSCRIBE,
 			SubscriptionStatus.NONE, SubscriptionStatus.BASIC, LocalDateTime.of(2026, 1, 1, 10, 0)));
 		historyRepository.save(JpaSubscriptionHistoryEntity.record(member, callCenter, SubscriptionActionType.CANCEL,
 			SubscriptionStatus.BASIC, SubscriptionStatus.NONE, LocalDateTime.of(2026, 1, 2, 10, 0)));
 
-		List<JpaSubscriptionHistoryEntity> histories = historyRepository.findByMemberIdOrderByChangedAtAsc(member.getId());
+		List<JpaSubscriptionHistoryEntity> histories = historyRepository.findByMemberIdOrderByChangedAtAsc(
+			member.getId());
 
+		// then
 		assertThat(histories)
 			.extracting(JpaSubscriptionHistoryEntity::getActionType)
 			.containsExactly(SubscriptionActionType.SUBSCRIBE, SubscriptionActionType.CANCEL);
@@ -84,6 +94,7 @@ class SubscriptionPersistenceTest {
 
 	@Test
 	void savesAndFindsIdempotencyKeyByPhoneNumberAndKey() {
+		// given
 		JpaIdempotencyKeyEntity idempotencyKey = JpaIdempotencyKeyEntity.completed(
 			"01012345678",
 			"request-key",
@@ -92,19 +103,24 @@ class SubscriptionPersistenceTest {
 			200
 		);
 
+		// when
 		idempotencyKeyRepository.save(idempotencyKey);
 
+		// then
 		assertThat(idempotencyKeyRepository.findByPhoneNumberAndIdempotencyKey("01012345678", "request-key"))
 			.hasValueSatisfying(found -> assertThat(found.getRequestHash()).isEqualTo("request-hash"));
 	}
 
 	@Test
 	void idempotencyAdapterSavesAndFindsCompletedResult() {
+		// given
 		JpaIdempotencyAdapter adapter = new JpaIdempotencyAdapter(idempotencyKeyRepository, new ObjectMapper());
 		SubscriptionResult response = new SubscriptionResult("01012345678", SubscriptionStatus.BASIC);
 
+		// when
 		adapter.saveCompleted(new CompletedIdempotency("01012345678", "adapter-key", "request-hash", response));
 
+		// then
 		assertThat(adapter.findCompleted("01012345678", "adapter-key"))
 			.hasValueSatisfying(found -> {
 				assertThat(found.requestHash()).isEqualTo("request-hash");
@@ -114,27 +130,34 @@ class SubscriptionPersistenceTest {
 
 	@Test
 	void memberAdapterSavesAndFindsMemberByPhoneNumber() {
+		// given
 		JpaMemberAdapter adapter = new JpaMemberAdapter(memberRepository);
 		Member member = Member.create("010-1234-5678", SubscriptionStatus.BASIC);
 
+		// when
 		adapter.save(member);
 
+		// then
 		assertThat(adapter.findByPhoneNumber("01012345678"))
 			.hasValueSatisfying(found -> assertThat(found.getSubscriptionStatus()).isEqualTo(SubscriptionStatus.BASIC));
 	}
 
 	@Test
 	void channelAdapterFindsChannelById() {
+		// given
 		JpaChannelAdapter adapter = new JpaChannelAdapter(channelRepository);
 
+		// when
 		Channel channel = adapter.getById(1L);
 
+		// then
 		assertThat(channel.name()).isEqualTo("홈페이지");
 		assertThat(channel.supportsSubscribe()).isTrue();
 	}
 
 	@Test
 	void historyAdapterSavesSubscriptionHistory() {
+		// given
 		JpaMemberAdapter memberAdapter = new JpaMemberAdapter(memberRepository);
 		JpaChannelAdapter channelAdapter = new JpaChannelAdapter(channelRepository);
 		JpaSubscriptionHistoryAdapter historyAdapter = new JpaSubscriptionHistoryAdapter(
@@ -145,9 +168,11 @@ class SubscriptionPersistenceTest {
 		Member member = memberAdapter.save(Member.create("01012345678", SubscriptionStatus.BASIC));
 		Channel channel = channelAdapter.getById(5L);
 
+		// when
 		historyAdapter.save(SubscriptionHistory.record(member, channel, SubscriptionActionType.CANCEL,
 			SubscriptionStatus.BASIC, SubscriptionStatus.NONE, LocalDateTime.now()));
 
+		// then
 		assertThat(historyRepository.findAll())
 			.extracting(JpaSubscriptionHistoryEntity::getActionType)
 			.containsExactly(SubscriptionActionType.CANCEL);
@@ -155,6 +180,7 @@ class SubscriptionPersistenceTest {
 
 	@Test
 	void historyAdapterFindsHistoriesByPhoneNumber() {
+		// given
 		JpaMemberEntity member = memberRepository.save(JpaMemberEntity.create("01012345678", SubscriptionStatus.NONE));
 		JpaChannelEntity homepage = channelRepository.findByName("홈페이지").orElseThrow();
 		JpaChannelEntity mobileApp = channelRepository.findByName("모바일앱").orElseThrow();
@@ -168,8 +194,10 @@ class SubscriptionPersistenceTest {
 			historyRepository
 		);
 
+		// when
 		List<SubscriptionHistory> histories = historyAdapter.findByPhoneNumber("01012345678");
 
+		// then
 		assertThat(histories)
 			.extracting(history -> history.channel().name())
 			.containsExactly("홈페이지", "모바일앱");

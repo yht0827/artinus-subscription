@@ -4,19 +4,18 @@ import java.util.Optional;
 
 import org.springframework.stereotype.Repository;
 
-import com.artinus.subscription.application.port.MemberPort;
+import com.artinus.subscription.application.port.out.MemberPort;
 import com.artinus.subscription.domain.member.Member;
 import com.artinus.subscription.infrastructure.persistence.entity.JpaMemberEntity;
 import com.artinus.subscription.infrastructure.persistence.repository.MemberRepository;
 
+import lombok.RequiredArgsConstructor;
+
 @Repository
+@RequiredArgsConstructor
 public class JpaMemberAdapter implements MemberPort {
 
 	private final MemberRepository memberRepository;
-
-	public JpaMemberAdapter(MemberRepository memberRepository) {
-		this.memberRepository = memberRepository;
-	}
 
 	@Override
 	public Optional<Member> findByPhoneNumber(String phoneNumber) {

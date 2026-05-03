@@ -151,4 +151,22 @@ class SubscriptionCommandControllerTest {
 			.andExpect(status().isBadRequest())
 			.andExpect(jsonPath("$.message").value("Idempotency-Key 헤더는 필수입니다."));
 	}
+
+	@Test
+	void returnsBadRequestWhenRequestBodyCannotBeParsed() throws Exception {
+		// when & then
+		mockMvc.perform(post("/api/v1/subscriptions")
+				.header("Idempotency-Key", "request-key")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "phoneNumber": "010-1234-5678",
+					  "channelId": "HOMEPAGE",
+					  "targetStatus": "BASIC"
+					}
+					"""))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.status").value(400))
+			.andExpect(jsonPath("$.message").value("요청 본문 형식이 올바르지 않습니다."));
+	}
 }

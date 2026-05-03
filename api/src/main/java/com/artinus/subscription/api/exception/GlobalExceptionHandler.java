@@ -2,6 +2,7 @@ package com.artinus.subscription.api.exception;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -48,6 +49,12 @@ public class GlobalExceptionHandler {
 	@ExceptionHandler(MissingRequestHeaderException.class)
 	public ResponseEntity<ErrorResponse> handleMissingRequestHeaderException(MissingRequestHeaderException exception) {
 		return buildResponse(HttpStatus.BAD_REQUEST, "%s 헤더는 필수입니다.".formatted(exception.getHeaderName()));
+	}
+
+	@ExceptionHandler(HttpMessageNotReadableException.class)
+	public ResponseEntity<ErrorResponse> handleHttpMessageNotReadableException(
+		HttpMessageNotReadableException exception) {
+		return buildResponse(HttpStatus.BAD_REQUEST, "요청 본문 형식이 올바르지 않습니다.");
 	}
 
 	@ExceptionHandler(Exception.class)

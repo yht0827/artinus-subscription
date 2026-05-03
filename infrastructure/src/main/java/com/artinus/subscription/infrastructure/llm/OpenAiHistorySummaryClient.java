@@ -20,6 +20,7 @@ public class OpenAiHistorySummaryClient implements HistorySummaryPort {
 	private final HistorySummaryPort fallbackSummaryPort;
 	private final OpenAiHistorySummaryRequestFactory requestFactory;
 	private final OpenAiResponseTextExtractor responseTextExtractor;
+	private final String model;
 
 	public OpenAiHistorySummaryClient(RestClient.Builder restClientBuilder, HistorySummaryPort fallbackSummaryPort,
 		String apiKey, String model, int maxOutputTokens) {
@@ -30,6 +31,7 @@ public class OpenAiHistorySummaryClient implements HistorySummaryPort {
 		this.fallbackSummaryPort = fallbackSummaryPort;
 		this.requestFactory = new OpenAiHistorySummaryRequestFactory(model, maxOutputTokens);
 		this.responseTextExtractor = new OpenAiResponseTextExtractor();
+		this.model = model;
 	}
 
 	@Override
@@ -38,6 +40,7 @@ public class OpenAiHistorySummaryClient implements HistorySummaryPort {
 			return fallbackSummaryPort.summarize(histories);
 		}
 		try {
+			log.info("OpenAI 구독 이력 요약 요청: model={}, historyCount={}", model, histories.size());
 			JsonNode response = restClient.post()
 				.uri(RESPONSES_PATH)
 				.body(requestFactory.create(histories))
@@ -45,11 +48,16 @@ public class OpenAiHistorySummaryClient implements HistorySummaryPort {
 				.body(JsonNode.class);
 			String summary = responseTextExtractor.extract(response);
 			if (summary.isBlank()) {
+				log.warn("OpenAI 구독 이력 요약 응답이 비어 있어 fallback 요약을 반환합니다. model={}, historyCount={}",
+					model, histories.size());
 				return fallback(histories);
 			}
+			log.info("OpenAI 구독 이력 요약 성공: model={}, historyCount={}, summaryLength={}",
+				model, histories.size(), summary.length());
 			return summary;
 		} catch (RestClientException | IllegalArgumentException exception) {
-			log.warn("OpenAI 구독 이력 요약에 실패해 fallback 요약을 반환합니다.", exception);
+			log.warn("OpenAI 구독 이력 요약에 실패해 fallback 요약을 반환합니다. model={}, historyCount={}",
+				model, histories.size(), exception);
 			return fallback(histories);
 		}
 	}

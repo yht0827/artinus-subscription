@@ -5,64 +5,58 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.artinus.subscription.application.SubscriptionCommandService;
-import com.artinus.subscription.application.SubscriptionHistoryQueryService;
-import com.artinus.subscription.application.command.CancelCommand;
-import com.artinus.subscription.application.command.SubscribeCommand;
-import com.artinus.subscription.application.result.SubscriptionHistoryResult;
-import com.artinus.subscription.application.result.SubscriptionResult;
-import com.artinus.subscription.domain.subscription.SubscriptionStatus;
+import com.artinus.subscription.api.docs.SubscriptionApiDocs;
+import com.artinus.subscription.api.request.SubscriptionCommandRequest;
+import com.artinus.subscription.api.response.SubscriptionCommandResponse;
+import com.artinus.subscription.api.response.SubscriptionHistoryResponse;
+import com.artinus.subscription.application.port.in.SubscriptionCommandUseCase;
+import com.artinus.subscription.application.port.in.SubscriptionHistoryQueryUseCase;
 
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @RestController
 @RequestMapping("/api/v1/subscriptions")
-public class SubscriptionCommandController {
+@RequiredArgsConstructor
+public class SubscriptionCommandController implements SubscriptionApiDocs {
 
-	private final SubscriptionCommandService subscriptionCommandService;
-	private final SubscriptionHistoryQueryService subscriptionHistoryQueryService;
+	private final SubscriptionCommandUseCase subscriptionCommandUseCase;
+	private final SubscriptionHistoryQueryUseCase subscriptionHistoryQueryUseCase;
 
-	public SubscriptionCommandController(SubscriptionCommandService subscriptionCommandService,
-		SubscriptionHistoryQueryService subscriptionHistoryQueryService) {
-		this.subscriptionCommandService = subscriptionCommandService;
-		this.subscriptionHistoryQueryService = subscriptionHistoryQueryService;
-	}
-
+	@Override
 	@PostMapping
-	public ResponseEntity<SubscriptionResult> subscribe(@RequestHeader("Idempotency-Key") String idempotencyKey,
+	public ResponseEntity<SubscriptionCommandResponse> subscribe(
+		@RequestHeader("Idempotency-Key") String idempotencyKey,
 		@RequestBody SubscriptionCommandRequest request) {
-		SubscriptionResult result = subscriptionCommandService.subscribe(new SubscribeCommand(
-			request.phoneNumber(),
-			request.channelId(),
-			request.targetStatus(),
-			idempotencyKey
+		log.info("구독 신청 요청 수신: channelId={}, targetStatus={}", request.channelId(), request.targetStatus());
+		return ResponseEntity.ok(SubscriptionCommandResponse.from(
+			subscriptionCommandUseCase.subscribe(request.toSubscribeCommand(idempotencyKey))
 		));
-		return ResponseEntity.ok(result);
 	}
 
+	@Override
 	@PostMapping("/cancel")
-	public ResponseEntity<SubscriptionResult> cancel(@RequestHeader("Idempotency-Key") String idempotencyKey,
+	public ResponseEntity<SubscriptionCommandResponse> cancel(
+		@RequestHeader("Idempotency-Key") String idempotencyKey,
 		@RequestBody SubscriptionCommandRequest request) {
-		SubscriptionResult result = subscriptionCommandService.cancel(new CancelCommand(
-			request.phoneNumber(),
-			request.channelId(),
-			request.targetStatus(),
-			idempotencyKey
+		log.info("구독 해지 요청 수신: channelId={}, targetStatus={}", request.channelId(), request.targetStatus());
+		return ResponseEntity.ok(SubscriptionCommandResponse.from(
+			subscriptionCommandUseCase.cancel(request.toCancelCommand(idempotencyKey))
 		));
-		return ResponseEntity.ok(result);
 	}
 
+	@Override
 	@GetMapping("/histories")
-	public ResponseEntity<SubscriptionHistoryResult> findHistories(@RequestParam("phoneNumber") String phoneNumber) {
-		return ResponseEntity.ok(subscriptionHistoryQueryService.findByPhoneNumber(phoneNumber));
-	}
-
-	public record SubscriptionCommandRequest(
-		String phoneNumber,
-		Long channelId,
-		SubscriptionStatus targetStatus
-	) {
+	public ResponseEntity<SubscriptionHistoryResponse> findHistories(
+		@RequestParam("phoneNumber") String phoneNumber) {
+		log.info("구독 이력 조회 요청 수신");
+		return ResponseEntity.ok(SubscriptionHistoryResponse.from(
+			subscriptionHistoryQueryUseCase.findByPhoneNumber(phoneNumber)
+		));
 	}
 }

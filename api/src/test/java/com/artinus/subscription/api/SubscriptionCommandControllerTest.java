@@ -1,11 +1,9 @@
 package com.artinus.subscription.api;
 
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.when;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -20,8 +18,8 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import com.artinus.subscription.application.SubscriptionCommandService;
-import com.artinus.subscription.application.SubscriptionHistoryQueryService;
+import com.artinus.subscription.application.port.in.SubscriptionCommandUseCase;
+import com.artinus.subscription.application.port.in.SubscriptionHistoryQueryUseCase;
 import com.artinus.subscription.application.result.SubscriptionHistoryResult;
 import com.artinus.subscription.application.result.SubscriptionResult;
 import com.artinus.subscription.domain.subscription.SubscriptionActionType;
@@ -35,10 +33,10 @@ class SubscriptionCommandControllerTest {
 	private MockMvc mockMvc;
 
 	@MockitoBean
-	private SubscriptionCommandService subscriptionCommandService;
+	private SubscriptionCommandUseCase subscriptionCommandUseCase;
 
 	@MockitoBean
-	private SubscriptionHistoryQueryService subscriptionHistoryQueryService;
+	private SubscriptionHistoryQueryUseCase subscriptionHistoryQueryUseCase;
 
 	@SpringBootConfiguration
 	@EnableAutoConfiguration
@@ -47,9 +45,11 @@ class SubscriptionCommandControllerTest {
 
 	@Test
 	void subscribesMember() throws Exception {
-		when(subscriptionCommandService.subscribe(any()))
+		// given
+		when(subscriptionCommandUseCase.subscribe(any()))
 			.thenReturn(new SubscriptionResult("01012345678", SubscriptionStatus.BASIC));
 
+		// when & then
 		mockMvc.perform(post("/api/v1/subscriptions")
 				.header("Idempotency-Key", "request-key")
 				.contentType(MediaType.APPLICATION_JSON)
@@ -67,9 +67,11 @@ class SubscriptionCommandControllerTest {
 
 	@Test
 	void cancelsMemberSubscription() throws Exception {
-		when(subscriptionCommandService.cancel(any()))
+		// given
+		when(subscriptionCommandUseCase.cancel(any()))
 			.thenReturn(new SubscriptionResult("01012345678", SubscriptionStatus.NONE));
 
+		// when & then
 		mockMvc.perform(post("/api/v1/subscriptions/cancel")
 				.header("Idempotency-Key", "request-key")
 				.contentType(MediaType.APPLICATION_JSON)
@@ -87,7 +89,8 @@ class SubscriptionCommandControllerTest {
 
 	@Test
 	void findsSubscriptionHistories() throws Exception {
-		when(subscriptionHistoryQueryService.findByPhoneNumber("010-1234-5678"))
+		// given
+		when(subscriptionHistoryQueryUseCase.findByPhoneNumber("010-1234-5678"))
 			.thenReturn(new SubscriptionHistoryResult(
 				List.of(new SubscriptionHistoryResult.HistoryItem(
 					"홈페이지",
@@ -99,6 +102,7 @@ class SubscriptionCommandControllerTest {
 				"2026년 1월 1일 홈페이지를 통해 일반 구독으로 구독하였습니다."
 			));
 
+		// when & then
 		mockMvc.perform(get("/api/v1/subscriptions/histories")
 				.param("phoneNumber", "010-1234-5678"))
 			.andExpect(status().isOk())

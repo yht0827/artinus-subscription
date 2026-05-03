@@ -9,6 +9,7 @@ import org.springframework.web.client.RestClientException;
 
 import com.artinus.subscription.application.port.out.HistorySummaryPort;
 import com.artinus.subscription.domain.history.SubscriptionHistory;
+import com.artinus.subscription.infrastructure.resilience.ExternalApiResilience;
 import com.fasterxml.jackson.databind.JsonNode;
 
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +23,7 @@ public class OpenAiHistorySummaryClient implements HistorySummaryPort {
 	private final HistorySummaryPort fallbackSummaryPort;
 	private final OpenAiHistorySummaryRequestFactory requestFactory;
 	private final OpenAiResponseTextExtractor responseTextExtractor;
+	private final ExternalApiResilience resilience;
 	private final String model;
 
 	public OpenAiHistorySummaryClient(RestClient.Builder restClientBuilder, HistorySummaryPort fallbackSummaryPort,
@@ -34,6 +36,7 @@ public class OpenAiHistorySummaryClient implements HistorySummaryPort {
 		this.fallbackSummaryPort = fallbackSummaryPort;
 		this.requestFactory = new OpenAiHistorySummaryRequestFactory(model, maxOutputTokens);
 		this.responseTextExtractor = new OpenAiResponseTextExtractor();
+		this.resilience = ExternalApiResilience.create("openai-history-summary");
 		this.model = model;
 	}
 
@@ -43,6 +46,7 @@ public class OpenAiHistorySummaryClient implements HistorySummaryPort {
 		this.fallbackSummaryPort = fallbackSummaryPort;
 		this.requestFactory = new OpenAiHistorySummaryRequestFactory(model, maxOutputTokens);
 		this.responseTextExtractor = new OpenAiResponseTextExtractor();
+		this.resilience = ExternalApiResilience.create("openai-history-summary");
 		this.model = model;
 	}
 
@@ -53,11 +57,12 @@ public class OpenAiHistorySummaryClient implements HistorySummaryPort {
 		}
 		try {
 			log.info("OpenAI 구독 이력 요약 요청: model={}, historyCount={}", model, histories.size());
-			JsonNode response = restClient.post()
-				.uri(RESPONSES_PATH)
-				.body(requestFactory.create(histories))
-				.retrieve()
-				.body(JsonNode.class);
+			JsonNode response = resilience.execute(() -> restClient.post()
+					.uri(RESPONSES_PATH)
+					.body(requestFactory.create(histories))
+					.retrieve()
+					.body(JsonNode.class)
+			);
 			String summary = responseTextExtractor.extract(response);
 			if (summary.isBlank()) {
 				log.warn("OpenAI 구독 이력 요약 응답이 비어 있어 fallback 요약을 반환합니다. model={}, historyCount={}",

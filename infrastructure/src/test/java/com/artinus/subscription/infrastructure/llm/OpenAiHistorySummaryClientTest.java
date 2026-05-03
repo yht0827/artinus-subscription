@@ -10,6 +10,7 @@ import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
+import org.springframework.test.web.client.ExpectedCount;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
@@ -59,7 +60,7 @@ class OpenAiHistorySummaryClientTest {
 	@Test
 	void returnsFallbackSummaryWhenOpenAiRequestFails() {
 		// given
-		server.expect(requestTo(OPENAI_RESPONSES_URL))
+		server.expect(ExpectedCount.twice(), requestTo(OPENAI_RESPONSES_URL))
 			.andRespond(withServerError());
 
 		// when

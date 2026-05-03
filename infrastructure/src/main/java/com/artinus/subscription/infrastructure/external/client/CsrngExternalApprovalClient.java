@@ -8,12 +8,14 @@ import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.web.client.RestClient;
 
 import com.artinus.subscription.application.port.out.ExternalApprovalPort;
+import com.artinus.subscription.infrastructure.resilience.ExternalApiResilience;
 
 @Component
 public class CsrngExternalApprovalClient implements ExternalApprovalPort {
 
 	private final RestClient restClient;
 	private final CsrngApprovalPolicy approvalPolicy = new CsrngApprovalPolicy();
+	private final ExternalApiResilience resilience;
 	private final String url;
 
 	public CsrngExternalApprovalClient(RestClient.Builder restClientBuilder,
@@ -23,11 +25,13 @@ public class CsrngExternalApprovalClient implements ExternalApprovalPort {
 		this.restClient = restClientBuilder
 			.requestFactory(requestFactory(connectTimeout, readTimeout))
 			.build();
+		this.resilience = ExternalApiResilience.create("csrng");
 		this.url = url;
 	}
 
 	CsrngExternalApprovalClient(RestClient restClient, String url) {
 		this.restClient = restClient;
+		this.resilience = ExternalApiResilience.create("csrng");
 		this.url = url;
 	}
 
@@ -37,10 +41,10 @@ public class CsrngExternalApprovalClient implements ExternalApprovalPort {
 	}
 
 	private CsrngResponse[] requestRandomResponses() {
-		return restClient.get()
+		return resilience.execute(() -> restClient.get()
 			.uri(url)
 			.retrieve()
-			.body(CsrngResponse[].class);
+			.body(CsrngResponse[].class));
 	}
 
 	private SimpleClientHttpRequestFactory requestFactory(Duration connectTimeout, Duration readTimeout) {

@@ -9,9 +9,8 @@ import com.artinus.subscription.application.port.out.ExternalApprovalPort;
 @Component
 public class CsrngExternalApprovalClient implements ExternalApprovalPort {
 
-	private static final int APPROVED_RANDOM_VALUE = 1;
-
 	private final RestClient restClient;
+	private final CsrngApprovalPolicy approvalPolicy = new CsrngApprovalPolicy();
 	private final String url;
 
 	public CsrngExternalApprovalClient(RestClient.Builder restClientBuilder,
@@ -22,7 +21,7 @@ public class CsrngExternalApprovalClient implements ExternalApprovalPort {
 
 	@Override
 	public boolean approve() {
-		return hasApprovedResponse(requestRandomResponses());
+		return approvalPolicy.isApproved(requestRandomResponses());
 	}
 
 	private CsrngResponse[] requestRandomResponses() {
@@ -32,12 +31,4 @@ public class CsrngExternalApprovalClient implements ExternalApprovalPort {
 			.body(CsrngResponse[].class);
 	}
 
-	private boolean hasApprovedResponse(CsrngResponse[] responses) {
-		return responses != null
-			&& responses.length > 0
-			&& responses[0].random() == APPROVED_RANDOM_VALUE;
-	}
-
-	private record CsrngResponse(String status, int min, int max, int random) {
-	}
 }

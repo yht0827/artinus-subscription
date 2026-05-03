@@ -2,6 +2,7 @@ package com.artinus.subscription.infrastructure.external.client;
 
 import java.time.Duration;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
@@ -18,6 +19,7 @@ public class CsrngExternalApprovalClient implements ExternalApprovalPort {
 	private final ExternalApiResilience resilience;
 	private final String url;
 
+	@Autowired
 	public CsrngExternalApprovalClient(RestClient.Builder restClientBuilder,
 		@Value("${external.csrng.url}") String url,
 		@Value("${external.csrng.connect-timeout}") Duration connectTimeout,

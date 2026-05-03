@@ -1,0 +1,77 @@
+@baseUrl = http://localhost:8080
+@phoneNumber = 010-1234-5678
+
+### Swagger UI 확인
+GET {{baseUrl}}/swagger-ui.html
+
+### OpenAPI JSON 확인
+GET {{baseUrl}}/v3/api-docs
+
+### 홈페이지에서 일반 구독 신청
+POST {{baseUrl}}/api/v1/subscriptions
+Content-Type: application/json
+Idempotency-Key: subscribe-basic-{{$timestamp}}
+
+{
+  "phoneNumber": "{{phoneNumber}}",
+  "channelId": 1,
+  "targetStatus": "BASIC"
+}
+
+### 홈페이지에서 프리미엄 구독 신청
+POST {{baseUrl}}/api/v1/subscriptions
+Content-Type: application/json
+Idempotency-Key: subscribe-premium-{{$timestamp}}
+
+{
+  "phoneNumber": "{{phoneNumber}}",
+  "channelId": 1,
+  "targetStatus": "PREMIUM"
+}
+
+### 콜센터에서 프리미엄 구독을 일반 구독으로 해지
+POST {{baseUrl}}/api/v1/subscriptions/cancel
+Content-Type: application/json
+Idempotency-Key: cancel-to-basic-{{$timestamp}}
+
+{
+  "phoneNumber": "{{phoneNumber}}",
+  "channelId": 5,
+  "targetStatus": "BASIC"
+}
+
+### 콜센터에서 일반 구독을 구독 안함으로 해지
+POST {{baseUrl}}/api/v1/subscriptions/cancel
+Content-Type: application/json
+Idempotency-Key: cancel-to-none-{{$timestamp}}
+
+{
+  "phoneNumber": "{{phoneNumber}}",
+  "channelId": 5,
+  "targetStatus": "NONE"
+}
+
+### 구독 이력 조회
+GET {{baseUrl}}/api/v1/subscriptions/histories?phoneNumber={{phoneNumber}}
+
+### 멱등성 확인 - 같은 키와 같은 요청 본문 반복
+POST {{baseUrl}}/api/v1/subscriptions
+Content-Type: application/json
+Idempotency-Key: repeat-same-key
+
+{
+  "phoneNumber": "010-9999-0000",
+  "channelId": 1,
+  "targetStatus": "BASIC"
+}
+
+### 멱등성 충돌 확인 - 같은 키와 다른 요청 본문
+POST {{baseUrl}}/api/v1/subscriptions
+Content-Type: application/json
+Idempotency-Key: repeat-same-key
+
+{
+  "phoneNumber": "010-9999-0000",
+  "channelId": 1,
+  "targetStatus": "PREMIUM"
+}

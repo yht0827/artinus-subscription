@@ -1,1 +1,7 @@
 rootProject.name = 'artinus-subscription'
+
+include 'domain'
+include 'application'
+include 'infrastructure'
+include 'api'
+include 'app'

@@ -1,0 +1,92 @@
+package com.artinus.subscription.infrastructure.llm;
+
+import java.time.Duration;
+import java.util.List;
+
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
+
+import com.artinus.subscription.application.port.out.HistorySummaryPort;
+import com.artinus.subscription.domain.history.SubscriptionHistory;
+import com.artinus.subscription.infrastructure.resilience.ExternalApiResilience;
+import com.fasterxml.jackson.databind.JsonNode;
+
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
+public class OpenAiHistorySummaryClient implements HistorySummaryPort {
+
+	private static final String RESPONSES_PATH = "/v1/responses";
+
+	private final RestClient restClient;
+	private final HistorySummaryPort fallbackSummaryPort;
+	private final OpenAiHistorySummaryRequestFactory requestFactory;
+	private final OpenAiResponseTextExtractor responseTextExtractor;
+	private final ExternalApiResilience resilience;
+	private final String model;
+
+	public OpenAiHistorySummaryClient(RestClient.Builder restClientBuilder, HistorySummaryPort fallbackSummaryPort,
+		String apiKey, String model, int maxOutputTokens, Duration connectTimeout, Duration readTimeout) {
+		this.restClient = restClientBuilder
+			.baseUrl("https://api.openai.com")
+			.defaultHeader("Authorization", "Bearer " + apiKey)
+			.requestFactory(requestFactory(connectTimeout, readTimeout))
+			.build();
+		this.fallbackSummaryPort = fallbackSummaryPort;
+		this.requestFactory = new OpenAiHistorySummaryRequestFactory(model, maxOutputTokens);
+		this.responseTextExtractor = new OpenAiResponseTextExtractor();
+		this.resilience = ExternalApiResilience.create("openai-history-summary");
+		this.model = model;
+	}
+
+	OpenAiHistorySummaryClient(RestClient restClient, HistorySummaryPort fallbackSummaryPort, String model,
+		int maxOutputTokens) {
+		this.restClient = restClient;
+		this.fallbackSummaryPort = fallbackSummaryPort;
+		this.requestFactory = new OpenAiHistorySummaryRequestFactory(model, maxOutputTokens);
+		this.responseTextExtractor = new OpenAiResponseTextExtractor();
+		this.resilience = ExternalApiResilience.create("openai-history-summary");
+		this.model = model;
+	}
+
+	@Override
+	public String summarize(List<SubscriptionHistory> histories) {
+		if (histories.isEmpty()) {
+			return fallbackSummaryPort.summarize(histories);
+		}
+		try {
+			log.info("OpenAI 구독 이력 요약 요청: model={}, historyCount={}", model, histories.size());
+			JsonNode response = resilience.execute(() -> restClient.post()
+					.uri(RESPONSES_PATH)
+					.body(requestFactory.create(histories))
+					.retrieve()
+					.body(JsonNode.class)
+			);
+			String summary = responseTextExtractor.extract(response);
+			if (summary.isBlank()) {
+				log.warn("OpenAI 구독 이력 요약 응답이 비어 있어 fallback 요약을 반환합니다. model={}, historyCount={}",
+					model, histories.size());
+				return fallback(histories);
+			}
+			log.info("OpenAI 구독 이력 요약 성공: model={}, historyCount={}, summaryLength={}",
+				model, histories.size(), summary.length());
+			return summary;
+		} catch (RestClientException | IllegalArgumentException exception) {
+			log.warn("OpenAI 구독 이력 요약에 실패해 fallback 요약을 반환합니다. model={}, historyCount={}",
+				model, histories.size(), exception);
+			return fallback(histories);
+		}
+	}
+
+	private String fallback(List<SubscriptionHistory> histories) {
+		return fallbackSummaryPort.summarize(histories);
+	}
+
+	private SimpleClientHttpRequestFactory requestFactory(Duration connectTimeout, Duration readTimeout) {
+		SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
+		requestFactory.setConnectTimeout(connectTimeout);
+		requestFactory.setReadTimeout(readTimeout);
+		return requestFactory;
+	}
+}

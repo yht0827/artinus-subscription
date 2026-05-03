@@ -40,3 +40,7 @@ out/
 
 # Local planning notes
 docs/superpowers/
+
+# Local environment variables
+.env
+.env.local

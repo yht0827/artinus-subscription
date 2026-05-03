@@ -1,0 +1,27 @@
+spring:
+  application:
+    name: artinus-subscription
+  datasource:
+    url: jdbc:mysql://localhost:3306/artinus_subscription
+    username: root
+    password: password
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  flyway:
+    enabled: true
+
+external:
+  csrng:
+    url: https://csrng.net/csrng/csrng.php?min=0&max=1
+    connect-timeout: 1s
+    read-timeout: 2s
+
+llm:
+  enabled: ${LLM_ENABLED:false}
+  api-key: ${OPENAI_API_KEY:}
+  model: ${OPENAI_MODEL:gpt-4.1-mini}
+  max-output-tokens: ${OPENAI_MAX_OUTPUT_TOKENS:180}
+  connect-timeout: ${OPENAI_CONNECT_TIMEOUT:1s}
+  read-timeout: ${OPENAI_READ_TIMEOUT:5s}

@@ -1,264 +1,148 @@
-# ARTINUS Backend Engineer (5~8년) 과제
+# ARTINUS Subscription
 
----
+## 프로젝트 개요
 
-## 개요
-- 구독 서비스 백엔드 API를 설계하고 구현하는 과제입니다.
-- 도메인 설계, API 구현, LLM 연동, 외부 API 장애 대응, 그리고 해당 시스템을 클라우드 환경에 배포/운영하기 위한 아키텍처 설계를 포함합니다.
+휴대폰번호 기반 회원 구독 상태를 관리하는 Spring Boot 백엔드 API입니다.
 
----
+구독 신청, 구독 해지, 구독 이력 조회를 제공하며 CSRNG 외부 승인, LLM 이력 요약, 멱등성, 동시성 제어, 외부 API 장애 대응을 포함합니다.
 
-## 도메인 정의
+```text
+Client
+  -> Subscription API
+  -> Idempotency 검증
+  -> 도메인 상태 전이 검증
+  -> CSRNG 외부 승인
+  -> 상태 변경 + 이력 저장
+  -> LLM/Fallback 이력 요약
+```
 
-### 구독 상태
-- 회원은 아래 3가지 구독 상태 중 1개의 상태만 가질 수 있습니다.
+## 핵심 기능
 
-| 상태 | 설명 |
+- 구독 신청: `NONE -> BASIC/PREMIUM`, `BASIC -> PREMIUM`
+- 구독 해지: `PREMIUM -> BASIC/NONE`, `BASIC -> NONE`
+- 채널별 구독/해지 가능 여부 검증
+- `Idempotency-Key` 기반 중복 요청 방지
+- CSRNG 외부 API 승인 결과에 따른 트랜잭션 처리
+- 구독 이력 조회 및 OpenAI 기반 자연어 요약
+- LLM 비활성화/장애 시 fallback 요약 반환
+- 동시 구독 상태 변경 충돌 응답 처리
+
+## 기술 스택
+
+| 카테고리 | 기술 |
 |---|---|
-| 구독 안함 | 구독하지 않은 상태 |
-| 일반 구독 | 일반 등급 구독 상태 |
-| 프리미엄 구독 | 프리미엄 등급 구독 상태 |
+| Language | Java 21 |
+| Framework | Spring Boot 3.5.14 |
+| Database | MySQL 8.4 |
+| ORM / Migration | Spring Data JPA, Flyway |
+| Architecture | Multi-module, Hexagonal Architecture |
+| External API | CSRNG, OpenAI Responses API |
+| Resilience | Resilience4j Retry / Circuit Breaker |
+| Test | JUnit 5, Spring Boot Test, Testcontainers |
+| Load Test | k6 |
+| CI | GitHub Actions |
+| Build | Gradle |
 
-### 채널
-- 채널이란 구독 및 해지를 수행할 수 있는 창구(접점)를 의미합니다.
-- 채널은 아래 3가지 타입으로 구분됩니다.
+## 아키텍처
 
-| 타입 | 구독 | 해지 |
+```text
+api
+  -> application (usecase / port)
+  -> domain
+  <- infrastructure (adapter)
+app
+  -> configuration / bootstrapping
+```
+
+| 모듈 | 책임 |
+|---|---|
+| `domain` | 회원, 채널, 구독 상태, 상태 전이 정책 |
+| `application` | 유스케이스, port, 멱등성 처리, fallback 요약 |
+| `infrastructure` | JPA, Flyway, CSRNG client, OpenAI client, resilience |
+| `api` | Controller, DTO, Swagger, 전역 예외 응답 |
+| `app` | Spring Boot 실행 진입점, Bean 조립 |
+
+## 구현 범위
+
+- 도메인: 휴대폰번호 값 객체, 구독 상태 전이, 채널 정책
+- API: 구독 신청, 구독 해지, 구독 이력 조회, Swagger 문서
+- 데이터: MySQL, Flyway, JPA, Testcontainers
+- 안정성: 멱등성, 낙관적 락, timeout, retry, circuit breaker
+- LLM: OpenAI 요약, fallback 요약, 로컬 `.env` 기반 API key 관리
+- 검증: GitHub Actions CI, k6 스모크 부하 테스트, 수동 검증 문서
+
+## API
+
+| 기능 | METHOD | URI |
 |---|---|---|
-| 구독/해지 모두 가능 | O | O |
-| 구독만 가능 | O | X |
-| 해지만 가능 | X | O |
+| 구독 신청 | POST | `/api/v1/subscriptions` |
+| 구독 해지 | POST | `/api/v1/subscriptions/cancel` |
+| 구독 이력 조회 | GET | `/api/v1/subscriptions/histories?phoneNumber={phoneNumber}` |
+| Health Check | GET | `/actuator/health` |
+| OpenAPI JSON | GET | `/v3/api-docs` |
 
-채널 예시
-- 구독 서비스의 가입 및 해지는 여러 채널을 통해 이루어질 수 있습니다.
+Swagger UI: `http://localhost:8080/swagger-ui.html`
 
-| 채널 | 구독 | 해지 |
-|---|---|---|
-| 홈페이지 | O | O |
-| 모바일앱 | O | O |
-| 네이버 | O | X |
-| SKT | O | X |
-| 콜센터 | X | O |
-| 이메일 | X | O |
-
-### 외부 API (csrng)
-- 구독하기 API와 구독 해지 API는 외부 API를 호출하고, 응답 결과에 따라 트랜잭션을 처리합니다.
-- 호출 예시
-    ```shell
-    curl -X GET https://csrng.net/csrng/csrng.php?min=0&max=1
-    ```
-- 응답 예시
-    ```json
-    [{ "status": "success", "min": 0, "max": 1, "random": 1 }]
-    ```
-- `random` 값에 따른 처리
-
-    | random 값 | 처리 |
-    |---|---|
-    | `1` | 정상 처리 — 트랜잭션 커밋 |
-    | `0` | 예외 발생 — 트랜잭션 롤백 |
-
----
-
-## 요구사항
-
-### 1. 구독하기 API
-
-- 요청: 휴대폰번호, 채널 ID, 변경할 구독 상태
-- 입력받은 채널이 구독 가능한 채널인 경우에만 구독할 수 있습니다.
-- 최초 회원은 구독 안함, 일반 구독, 프리미엄 구독 중 어떤 상태로든 가입할 수 있습니다.
-- 외부 API 호출 후, 응답에 따라 트랜잭션을 커밋 또는 롤백합니다.
-- 구독 상태 변경 규칙
-
-    | 현재 상태  | 변경 가능 상태              |
-    |--------|-----------------------|
-    | 구독 안함  | 일반 구독, 프리미엄 구독        |
-    | 일반 구독  | 프리미엄 구독               |
-    | 프리미엄 구독 | _(변경 불가)_             |
-
-### 2. 구독 해지 API
-
-- 요청: 휴대폰번호, 채널 ID, 변경할 구독 상태
-- 입력받은 채널이 해지 가능한 채널인 경우에만 해지할 수 있습니다.
-- 외부 API 호출 후, 응답에 따라 트랜잭션을 커밋 또는 롤백합니다.
-- 해지 상태 변경 규칙
-
-    | 현재 상태 | 변경 가능 상태 |
-    |---|---|
-    | 프리미엄 구독 | 일반 구독, 구독 안함 |
-    | 일반 구독 | 구독 안함 |
-    | 구독 안함 | _(변경 불가)_ |
-
-### 3. 구독 이력 조회 API
-
-- 요청: 휴대폰번호
-- 응답:
-  - 해당 회원의 구독하기, 구독해지 이력 목록(채널, 구독/해지날짜, 구독 상태 포함)
-  - 이력 데이터를 기반으로 LLM API를 호출하여 생성한 자연어 요약
-  - LLM API 선택은 자유입니다.
-- 응답 예시:
-    ```json
-    {
-      "history": [..],
-      "summary": "2026년 1월 1일 홈페이지를 통해 일반 구독으로 가입한 뒤, 2월 1일 모바일앱에서 프리미엄 구독하였습니다. 3월 1일 콜센터를 통해 프리미엄 구독을 해지하여 구독 안함 상태입니다."
-    }
-    ```
-
-### 기타
-- 회원은 구독 및 해지를 여러 번 수행할 수 있습니다.
-- 외부 API(csrng) 호출 시 발생할 수 있는 장애 상황에 대한 대응 전략을 구현해 주세요.
-- 구현한 API 서버를 AWS 와 같은 클라우드 환경에 배포/운영한다고 가정하고, 아키텍처 및 구성, 보안, 확장성 등을 포함한 설계 문서를 포함해 주세요.
-- 선택한 기술에 대한 근거, 분석 및 구현 내용 등은 `readme.md` 파일에 작성해 주세요.
-- 요구사항에 명시되지 않은 부분은 일반적인 구독 서비스의 동작을 참고하여 자유롭게 구현해 주세요.
-
----
-
-## 제약사항
-- 언어, 프레임워크, 데이터베이스, 외부 API 등 모든 기술 선택에 제약이 없습니다.
-- API Key 와 같은 인증 정보는 레포지토리에 포함되지 않도록 주의해 주세요.
-
----
-
-## 평가 항목
-- 아키텍처 설계 및 프로젝트 구성
-- 요구사항 이해
-- API 설계 및 구현
-- 외부 API 장애 대응
-- 클라우드 인프라 설계 
-
----
-
-## 외부 API 장애 대응 전략
-
-### 대상 외부 API
-- 구독/해지 명령 처리 시 `csrng` API를 호출합니다.
-- 응답의 `random` 값이 `1`이면 승인, `0`이면 거절로 판단합니다.
-- 구독 이력 조회의 자연어 요약은 외부 LLM 호출을 확장 지점으로 두되, API key가 없거나 LLM 호출이 실패해도 fallback 요약으로 응답할 수 있게 분리했습니다.
-
-### 처리 원칙
-- 외부 API 실패는 성공으로 간주하지 않습니다.
-- `csrng` 호출 결과가 거절이거나 응답을 신뢰할 수 없으면 구독 상태 변경과 이력 저장을 진행하지 않습니다.
-- 같은 요청이 재시도될 수 있으므로 `Idempotency-Key`를 사용합니다.
-- 성공한 요청만 멱등성 완료 결과로 저장합니다.
-- 외부 API 실패 또는 거절은 완료 결과로 저장하지 않아, 같은 키로 재시도할 수 있습니다.
-- Redis는 현재 요구사항에서는 사용하지 않습니다. 멱등성은 DB unique constraint와 상태 테이블로 보장하고, Redis는 TTL 기반 멱등성 저장소나 분산 락이 필요한 규모에서 도입하는 것을 기준으로 합니다.
-
-### 트랜잭션 경계
-- 도메인 검증과 채널 권한 검증을 먼저 수행합니다.
-- 외부 API 승인 후에 회원 상태 변경과 구독 이력 저장을 수행합니다.
-- DB 변경과 이력 저장은 하나의 트랜잭션으로 묶는 것을 기준으로 합니다.
-- 트랜잭션 커밋 이후에는 같은 `Idempotency-Key` 요청에 대해 저장된 응답을 재사용합니다.
-
-### 실패 유형별 대응
-- `random=0`: 비즈니스 거절로 처리하고 예외를 반환합니다.
-- 네트워크 오류, timeout, 5xx 응답: 외부 API 장애로 보고 실패 응답을 반환합니다.
-- 빈 응답 또는 예상하지 못한 응답: 신뢰할 수 없는 응답으로 보고 실패 처리합니다.
-- LLM 요약 실패: 구독 이력 조회 자체는 실패시키지 않고 fallback 요약을 반환합니다.
-
-### 운영 보완 정책
-- 연결 timeout과 read timeout을 짧게 설정해 사용자 요청이 오래 묶이지 않도록 합니다.
-- 짧은 재시도는 네트워크 일시 장애에만 제한하고, `random=0` 같은 비즈니스 거절은 재시도하지 않습니다.
-- 장애율이 높아지면 circuit breaker로 외부 API 호출을 빠르게 실패시켜 DB와 WAS 자원을 보호합니다.
-- 외부 API latency, 실패율, timeout 수, fallback 사용 횟수를 metric으로 수집합니다.
-- 장애 상황 분석을 위해 요청 ID, `Idempotency-Key`, 외부 API 응답 상태를 로그에 남기되 개인정보와 API key는 기록하지 않습니다.
-- `idempotency_keys` 만료 데이터 정리와 구독 이력 아카이빙은 운영 보관 정책이 확정된 뒤 별도 배치/스케줄러로 분리합니다.
-
----
-
-## 로컬 실행 방법
-
-### MySQL 실행
-
-애플리케이션 기본 설정은 로컬 MySQL을 사용합니다.
+## 실행 방법
 
 ```bash
 docker compose up -d mysql
+./gradlew :app:bootRun
 ```
 
-기본 접속 정보:
+로컬 MySQL 기본 접속 정보:
+
 - host: `localhost`
 - port: `3306`
 - database: `artinus_subscription`
 - username: `root`
 - password: `password`
 
-### 애플리케이션 실행
+LLM 요약은 기본 비활성화입니다. OpenAI 연동이 필요할 때만 `.env`를 생성하고 `LLM_ENABLED=true`로 실행합니다.
 
 ```bash
+cp .env.example .env
+set -a
+source .env
+set +a
 ./gradlew :app:bootRun
 ```
 
-Flyway가 실행 시점에 schema와 채널 seed data를 반영합니다.
+## 테스트 및 검증
 
-### 테스트 실행
-
-DB 통합 테스트는 실제 MySQL과의 차이를 줄이기 위해 Testcontainers 기반 MySQL을 사용합니다.
-테스트 실행 전 Docker 또는 OrbStack이 실행 중이어야 합니다.
+전체 테스트:
 
 ```bash
 ./gradlew test
 ```
 
-### k6 스모크 부하 테스트
+DB 통합 테스트는 MySQL Testcontainers를 사용하므로 Docker 또는 OrbStack이 실행 중이어야 합니다.
 
-애플리케이션 실행 후 health check와 구독 이력 조회 경로를 낮은 부하로 확인합니다.
-구독/해지 명령 API는 CSRNG 외부 API와 DB 상태 변경이 포함되므로 스모크 부하 테스트 대상에서 제외했습니다.
+k6 스모크 부하 테스트:
 
 ```bash
 BASE_URL=http://localhost:8080 PHONE_NUMBER=010-7777-2214 k6 run k6/subscription-smoke.js
 ```
 
-최종 수동 검증 결과는 [docs/verification/manual-test-2026-05-03.md](docs/verification/manual-test-2026-05-03.md)에 정리했습니다.
+구독/해지 명령 API는 CSRNG 외부 API와 DB 상태 변경이 포함되므로 k6 스모크 대상에서는 제외했습니다.
 
----
+## CI
+
+GitHub Actions에서 `main`, `dev` 브랜치 push 및 PR 시 `./gradlew test`를 실행합니다.
+
+## 문서
+
+| 문서 | 설명 |
+|---|---|
+| [요구사항 정의](docs/01-requirements.md) | 도메인 용어, API 요구사항, 상태 전이, 외부 API/LLM 정책 |
+| [시퀀스 다이어그램](docs/02-sequence-diagrams.md) | 구독/해지/멱등성/LLM/동시성 주요 런타임 흐름 |
+| [클래스 다이어그램](docs/03-class-diagrams.md) | 계층 구조와 핵심 클래스 책임 |
+| [ERD](docs/04-erd.md) | 테이블 관계, 인덱스, 운영 체크포인트 |
+| [ADR](docs/05-adr.md) | 주요 기술 선택과 설계 결정 이유 |
+| [최종 수동 검증 결과](docs/verification/manual-test-2026-05-03.md) | 로컬 실행, API 검증, k6 스모크 결과 |
 
 ## 제출 방법
-- 안내 드린 마감일 전까지 github public repository URL을 아래 메일로 회신 부탁드립니다.
-  - 메일: recruit@artinus.dev
 
----
+안내 받은 마감일 전까지 GitHub public repository URL을 아래 메일로 회신합니다.
 
-## 구현 체크리스트
-
-### 완료
-- [x] Spring Boot 프로젝트 초기 구성
-- [x] `main` / `dev` 브랜치 분리
-- [x] Gradle 멀티모듈 구조 구성
-- [x] 헥사고날 아키텍처 기본 모듈 분리
-  - [x] `domain`
-  - [x] `application`
-  - [x] `infrastructure`
-  - [x] `api`
-  - [x] `app`
-- [x] 휴대폰번호 값 객체 구현
-- [x] 구독 상태 전이 정책 구현
-- [x] Flyway 기반 DB schema 작성
-- [x] 채널 seed data 작성
-- [x] JPA 영속성 엔티티 및 repository 구성
-- [x] 영속성 테스트 작성
-- [x] application port 정의
-- [x] 구독/해지 command use case 구현
-- [x] 구독/해지 유스케이스 테스트 작성
-- [x] Idempotency-Key 애플리케이션 정책 구현
-- [x] Idempotency-Key 영속성 adapter 연결
-- [x] csrng 외부 API client 구현
-- [x] REST API 구현
-- [x] 구독 이력 조회 구현
-- [x] LLM 요약 fallback 구현
-- [x] OpenAI 기반 LLM 요약 연동
-- [x] OpenAI 요약 호출 로그 추가
-- [x] 외부 API 장애 대응 정책 정리
-- [x] 외부 API timeout 설정 적용
-- [x] 외부 API retry / circuit breaker 적용
-- [x] 구독 상태 변경 동시성 충돌 응답 처리
-- [x] 요청 validation / JSON 파싱 예외 응답 처리
-- [x] 로컬 MySQL docker compose 구성
-- [x] DB 통합 테스트 MySQL Testcontainers 적용
-- [x] GitHub Actions Gradle 테스트 워크플로 구성
-- [x] k6 스모크 부하 테스트 스크립트 작성
-- [x] 최종 수동 검증 결과 정리
-
-### 예정
-- [ ] Idempotency-Key 만료 데이터 정리 정책 구현
-- [ ] 구독 이력 아카이빙 정책 구체화
-- [ ] AWS 배포/운영 아키텍처 문서화
+- `recruit@artinus.dev`

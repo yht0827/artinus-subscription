@@ -18,15 +18,17 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import com.artinus.subscription.api.exception.GlobalExceptionHandler;
 import com.artinus.subscription.application.port.in.SubscriptionCommandUseCase;
 import com.artinus.subscription.application.port.in.SubscriptionHistoryQueryUseCase;
 import com.artinus.subscription.application.result.SubscriptionHistoryResult;
 import com.artinus.subscription.application.result.SubscriptionResult;
+import com.artinus.subscription.domain.exception.InvalidPhoneNumberException;
 import com.artinus.subscription.domain.subscription.SubscriptionActionType;
 import com.artinus.subscription.domain.subscription.SubscriptionStatus;
 
 @WebMvcTest(SubscriptionCommandController.class)
-@Import(SubscriptionCommandController.class)
+@Import({SubscriptionCommandController.class, GlobalExceptionHandler.class})
 class SubscriptionCommandControllerTest {
 
 	@Autowired
@@ -110,5 +112,43 @@ class SubscriptionCommandControllerTest {
 			.andExpect(jsonPath("$.history[0].actionType").value("SUBSCRIBE"))
 			.andExpect(jsonPath("$.history[0].afterStatus").value("BASIC"))
 			.andExpect(jsonPath("$.summary").value("2026년 1월 1일 홈페이지를 통해 일반 구독으로 구독하였습니다."));
+	}
+
+	@Test
+	void returnsBadRequestWhenDomainExceptionOccurs() throws Exception {
+		// given
+		when(subscriptionCommandUseCase.subscribe(any()))
+			.thenThrow(new InvalidPhoneNumberException("휴대폰번호는 010으로 시작해야 합니다."));
+
+		// when & then
+		mockMvc.perform(post("/api/v1/subscriptions")
+				.header("Idempotency-Key", "request-key")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "phoneNumber": "011-1234-5678",
+					  "channelId": 1,
+					  "targetStatus": "BASIC"
+					}
+					"""))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.status").value(400))
+			.andExpect(jsonPath("$.message").value("휴대폰번호는 010으로 시작해야 합니다."));
+	}
+
+	@Test
+	void returnsBadRequestWhenIdempotencyKeyIsMissing() throws Exception {
+		// when & then
+		mockMvc.perform(post("/api/v1/subscriptions")
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("""
+					{
+					  "phoneNumber": "010-1234-5678",
+					  "channelId": 1,
+					  "targetStatus": "BASIC"
+					}
+					"""))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath("$.message").value("Idempotency-Key 헤더는 필수입니다."));
 	}
 }
